@@ -19,4 +19,4 @@ it('従来の地図キー発行経路は廃止し、Embedキーは検索回数�
 
 it('除外設定は匿名と他サイトから変更できない',async()=>{const configuration={...env,USAGE_BUDGET:budget()};expect((await worker.fetch(request('/api/preferences',undefined,{excludeVisited:false}),configuration,{} as ExecutionContext)).status).toBe(401);const cookie=await session();const forged=new Request(base+'/api/preferences',{method:'POST',headers:{Cookie:cookie,Origin:'https://other.test'},body:JSON.stringify({excludeVisited:false})});expect((await worker.fetch(forged,configuration,{} as ExecutionContext)).status).toBe(403);});
 
-it('管理者だけが5回を超えて検索でき、一般ユーザーの偽装は通らない',async()=>{const configuration={...env,USAGE_BUDGET:budget()},cookie=await session('owner','owner@gmail.com');for(let i=0;i<6;i++)expect((await worker.fetch(request('/api/search',cookie),configuration,{} as ExecutionContext)).status).toBe(200);});
+it('管理者は全体日次20回を超えて検索できる',async()=>{const configuration={...env,USAGE_BUDGET:budget()},cookie=await session('owner','owner@gmail.com');for(let i=0;i<25;i++)expect((await worker.fetch(request('/api/search',cookie),configuration,{} as ExecutionContext)).status).toBe(200);});

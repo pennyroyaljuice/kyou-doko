@@ -10,4 +10,4 @@ it('残数表示は検索を消費しない',()=>{const s:UsageState={days:{}};f
 
 it('引き上げ時も既存の利用量を維持する',()=>{const s:UsageState={days:{'2026-11-01':{search:10,photo:499,map:0,users:{a:3}}}};const r=decideUsage(s,'a','search',now,false);expect(r.remaining).toBe(2);expect(r.dailySearches).toBe(10);expect(r.rolling.photo).toBe(499);});
 
-it('管理者は個人の5回上限を免除するが全体20回で停止',()=>{const s:UsageState={days:{}};for(let i=0;i<20;i++)expect(decideUsage(s,'owner','search',now,true,true).allowed).toBe(true);const denied=decideUsage(s,'owner','search',now,true,true);expect(denied.allowed).toBe(false);expect(denied.reason).toContain('サービス全体');expect(denied.dailySearches).toBe(20);});
+it('管理者は個人・全体・写真すべての上限を超えて利用でき、一般利用者は停止する',()=>{const s:UsageState={days:{'2026-11-01':{search:250,photo:600,map:1100,users:{owner:10}}}};for(const kind of ['search','photo','map'] as const){const r=decideUsage(s,'owner',kind,now,true,true);expect(r.allowed).toBe(true);expect(r.remaining).toBeNull();expect(r.unlimited).toBe(true);expect(decideUsage(s,'member',kind,now,true).allowed).toBe(false);}expect(s.days['2026-11-01'].search).toBe(251);});

@@ -19,12 +19,12 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const [theme,setTheme]=useState<DestinationTheme>('all');
   const [avoidHighways,setAvoidHighways]=useState(false);
   const [result,setResult]=useState<SearchResult|null>(null),[selectedId,setSelectedId]=useState(''),[view,setView]=useState<'list'|'map'>('list'),[busy,setBusy]=useState(false),[locating,setLocating]=useState(false),[error,setError]=useState('');
-  const [usage,setUsage]=useState<{remaining:number;resetAt:string;allowed?:boolean;reason?:string;rolling?:{search:number;photo:number;map:number};dailySearches?:number}|null>(null);
+  const [usage,setUsage]=useState<{remaining:number|null;resetAt:string;allowed?:boolean;reason?:string;rolling?:{search:number;photo:number;map:number};dailySearches?:number}|null>(null);
   const refreshUsage=useCallback(async()=>{if(!signedIn)return;try{const response=await fetch('/api/usage');if(response.ok)setUsage(await response.json());}catch{}},[signedIn]);
   useEffect(()=>{void refreshUsage();},[refreshUsage]);
   useEffect(()=>{if(!usage)return;const timer=setTimeout(()=>void refreshUsage(),Math.max(1000,Date.parse(usage.resetAt)-Date.now()+1000));return()=>clearTimeout(timer);},[usage,refreshUsage]);
   const {prefs,saving:prefSaving,error:prefError,save:savePreference}=usePlacePreferences(signedIn);
-  const searchBlocked=source==='google'&&!!usage&&(usage.remaining===0||usage.allowed===false);
+  const searchBlocked=source==='google'&&!isOwner&&!!usage&&(usage.remaining===0||usage.allowed===false);
   const blockedReason=usage?.reason||(usage?.remaining===0?'本日の検索上限に達しました。日本時間の0時に更新されます。':'サービス全体の利用上限に達しました。');
   const selected=result?.destinations.find(d=>d.id===selectedId);
   const onSelect=useCallback((id:string)=>setSelectedId(id),[]);
@@ -61,7 +61,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   }
   const changeSource=(s:'demo'|'google')=>{if(s==='google'&&!liveAccess)return;reset();setSource(s);setGps(null);setGpsAccuracy(null);setOrigin(s==='demo'?'東京駅':'');};
   return <>
-    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>今日どこいく<span className="brand-question">？</span></a><div className="header-right"><span className="edition">{isOwner?'管理者':signedIn?'無料アカウント':'公開デモ'}</span>{signedIn?<a className="account-link" href="/admin/logout" target="_top">ログアウト</a>:<a className="account-link" href={publicEnabled?'/login':'/admin/'} target="_top">{publicEnabled?'Googleでログイン':'管理者ログイン'}</a>}</div></header>
+    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>今日どこ行く<span className="brand-question">？</span></a><div className="header-right"><span className="edition">{isOwner?'管理者':signedIn?'無料アカウント':'公開デモ'}</span>{signedIn?<a className="account-link" href="/admin/logout" target="_top">ログアウト</a>:<a className="account-link" href={publicEnabled?'/login':'/admin/'} target="_top">{publicEnabled?'Googleでログイン':'管理者ログイン'}</a>}</div></header>
     <main>
       <section className="search-panel" aria-labelledby="search-heading">
         <div className="panel-top"><h1 id="search-heading"><SlidersHorizontal size={17}/>検索条件</h1><div className="source-switch" aria-label="データモード"><button aria-pressed={source==='demo'} onClick={()=>changeSource('demo')} disabled={busy||locating}>デモ</button><button aria-pressed={source==='google'} onClick={()=>changeSource('google')} disabled={!liveAccess||busy||locating} title={!liveAccess?'実検索にはGoogleログインが必要です':!liveAvailable?'実API利用には環境変数の設定が必要です':undefined}>通常検索</button></div></div>
@@ -74,7 +74,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       </section>
       {searchBlocked&&<div id="search-blocked-reason" className="setup-banner" role="status"><span>{blockedReason} デモは回数制限なく利用できます。</span><button type="button" className="text-button" onClick={()=>changeSource('demo')}>デモを使う</button></div>}
       {publicEnabled&&!signedIn&&<div className="setup-banner"><span>Googleログインで1日5回まで検索できます（日本時間0時更新）。</span><a href="/login">Googleでログイン</a></div>}
-      {signedIn&&usage&&<div className="usage-notice" role="status">{isOwner?'管理者 · 個人の検索回数制限なし':<>無料プラン · 本日の検索 あと{usage.remaining}回 / 5回（日本時間0時更新）</>}{isOwner&&usage.rolling&&<span> · 全体：本日{usage.dailySearches}/20回、直近32日{usage.rolling.search}/200回 · 写真{usage.rolling.photo}/500 · 埋め込み地図は無料表示</span>}<small>検索開始時に消費します。0件・通信失敗でも回数は戻りません。サービス全体の上限で停止する場合があります。</small><button className="text-button" onClick={()=>void refreshUsage()}>利用状況を更新</button></div>}
+      {signedIn&&usage&&<div className="usage-notice" role="status">{isOwner?'管理者 · 利用回数の制限なし':<>無料プラン · 本日の検索 あと{usage.remaining}回 / 5回（日本時間0時更新）</>}{isOwner&&usage.rolling&&<span> · 利用量：本日検索{usage.dailySearches}回、直近32日検索{usage.rolling.search}回 · 写真{usage.rolling.photo}枚 · 埋め込み地図は無料表示</span>}<small>検索開始時に消費します。0件・通信失敗でも回数は戻りません。サービス全体の上限で停止する場合があります。</small><button className="text-button" onClick={()=>void refreshUsage()}>利用状況を更新</button></div>}
       {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/admin/setup">設定手順</a></div>}
       <div className="mode-notice"><span className={source==='demo'?'demo-badge':'live-badge'}>{source==='demo'?'DEMO':liveAvailable?'LIVE':'準備中'}</span><span>{source==='demo'?'表示される時間・距離はサンプルです。実際の検索結果ではありません。':liveAvailable?'現在地は検索ボタンを押したときにGoogleへ送信します。':'位置情報はブラウザー内だけで保持し、現在は検索サービスへ送信しません。'}</span></div>
       {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
@@ -92,6 +92,6 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
         </div>
         {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}<button className="text-button" onClick={()=>void submit()} disabled={busy}>同じ条件で再検索（実APIでは新たに利用量が発生） <RefreshCw size={13}/></button></div>}
       </section>
-    </main><footer><span className="footer-brand">今日どこいく？</span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} 今日どこいく？</span></div></footer>
+    </main><footer><span className="footer-brand">今日どこ行く？</span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} 今日どこ行く？</span></div></footer>
   </>;
 }

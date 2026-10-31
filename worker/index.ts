@@ -41,7 +41,7 @@ export default {
   if(path==='/api/photo'||path==='/admin/api/photo'){
    if(!searchAccess)return new Response(null,{status:401});
    if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
-   return servePhoto(request,env,fetch,async()=>{try{return (await checkUsage(env,identity!.sub,'photo',true)).allowed;}catch{return false;}});
+   return servePhoto(request,env,fetch,async()=>{try{return (await checkUsage(env,identity!.sub,'photo',true,identity!.isOwner)).allowed;}catch{return identity!.isOwner;}},identity!.isOwner);
   }
   if((path==='/api/search'||path==='/admin/api/search')&&request.method==='POST'){
    if(!sameOrigin(request))return Response.json({error:'このサイトの画面から検索してください。'},{status:403});

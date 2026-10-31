@@ -8,9 +8,9 @@ export class UsageBudget {
    if(request.method!=='POST')return new Response(null,{status:405});
    try{const body=await request.json();const result=await this.state.storage.transaction(async tx=>{const next=updatePreferences(await tx.get<Preferences>('preferences')??emptyPreferences(),body);await tx.put('preferences',next);return next;});return Response.json(result);}catch(e){return Response.json({error:e instanceof Error?e.message:'保存できませんでした。'},{status:400});}
   }
-  const body=await request.json() as {subject:string;kind:UsageKind;reserve:boolean;exemptDaily?:boolean};
+  const body=await request.json() as {subject:string;kind:UsageKind;reserve:boolean;unlimited?:boolean};
   if(!/^[a-f0-9]{64}$/.test(body.subject)||!['search','photo','map'].includes(body.kind)||typeof body.reserve!=='boolean')return new Response(null,{status:400});
-  const result=await this.state.storage.transaction(async tx=>{const state=await tx.get<UsageState>('usage')??{days:{}};const result=decideUsage(state,body.subject,body.kind,Date.now(),body.reserve,body.exemptDaily===true);await tx.put('usage',state);return result;});
+  const result=await this.state.storage.transaction(async tx=>{const state=await tx.get<UsageState>('usage')??{days:{}};const result=decideUsage(state,body.subject,body.kind,Date.now(),body.reserve,body.unlimited===true);await tx.put('usage',state);return result;});
   if(!await this.state.storage.getAlarm())await this.state.storage.setAlarm(Date.now()+86400000);
   return Response.json(result,{headers:{'Cache-Control':'no-store'}});
  }
@@ -21,10 +21,10 @@ export class UsageBudget {
  }
 }
 export type UsageEnvironment={USAGE_BUDGET?:DurableObjectNamespace};
-export async function checkUsage(env:UsageEnvironment,sub:string,kind:UsageKind,reserve:boolean,exemptDaily=false){
+export async function checkUsage(env:UsageEnvironment,sub:string,kind:UsageKind,reserve:boolean,unlimited=false){
  if(!env.USAGE_BUDGET)throw Error('Usage budget unavailable');
  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));const subject=[...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
- const response=await env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('global-v1')).fetch('https://usage.internal/',{method:'POST',body:JSON.stringify({subject,kind,reserve,exemptDaily})});
+ const response=await env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('global-v1')).fetch('https://usage.internal/',{method:'POST',body:JSON.stringify({subject,kind,reserve,unlimited})});
  if(!response.ok)throw Error('Usage budget unavailable');
  return response.json() as Promise<ReturnType<typeof decideUsage>>;
 }

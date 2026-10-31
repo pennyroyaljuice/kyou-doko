@@ -8,13 +8,13 @@ export async function photoTicket(name:string,secret:string){
 export type PhotoEnvironment={ADMIN_SESSION_SECRET?:string;GOOGLE_MAPS_API_KEY?:string;LIVE_SEARCH_ENABLED?:string;PHOTO_LIMITER?:{limit(input:{key:string}):Promise<{success:boolean}>}};
 const error=(status:number,reason="photo unavailable")=>new Response(reason+" ("+status+")",{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 // Called only after the Worker's owner authentication. Never accept arbitrary upstream URLs.
-export async function servePhoto(request:Request,env:PhotoEnvironment,fetcher:typeof fetch=fetch,reserve?:()=>Promise<boolean>){
+export async function servePhoto(request:Request,env:PhotoEnvironment,fetcher:typeof fetch=fetch,reserve?:()=>Promise<boolean>,unlimited=false){
  if(request.method!=='GET')return error(405);
  if(env.LIVE_SEARCH_ENABLED!=='true'||!env.GOOGLE_MAPS_API_KEY||!env.PHOTO_LIMITER)return error(503);
  const token=new URL(request.url).searchParams.get('ticket');if(!token||token.length>8192)return error(400);
  let name:string;
  try{const {payload}=await jwtVerify(token,encoder.encode(env.GOOGLE_MAPS_API_KEY),{audience:'kyou-place-photo',algorithms:['HS256'],requiredClaims:['exp','iat']});if(typeof payload.photo!=='string'||!validName(payload.photo))return error(400);name=payload.photo;}catch{return error(403);}
- if(!(await env.PHOTO_LIMITER.limit({key:'photo:'+(request.headers.get('CF-Connecting-IP')??'unknown')})).success)return error(429);
+ if(!unlimited&&!(await env.PHOTO_LIMITER.limit({key:'photo:'+(request.headers.get('CF-Connecting-IP')??'unknown')})).success)return error(429);
  if(reserve&&!await reserve())return error(429);
  try{
   const url=new URL('https://places.googleapis.com/v1/'+name+'/media');url.search=new URLSearchParams({maxWidthPx:'240',maxHeightPx:'180',skipHttpRedirect:'true'}).toString();
