@@ -2,19 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SearchResult, Destination, Point } from '@/lib/domain';
 let load:Promise<void>|undefined;
-function loadMaps() {
+function loadMaps(apiKey:string) {
   if (load) return load;
   load = new Promise((resolve,reject)=>{
     const w = window as typeof window & { initKyouMaps?:()=>void; gm_authFailure?:()=>void };
     w.initKyouMaps=()=>resolve(); w.gm_authFailure=()=>{window.dispatchEvent(new Event('kyou-maps-auth-error'));reject(new Error('地図の認証に失敗しました。キーの制限・課金設定を確認してください。'));};
     const script=document.createElement('script');
-    script.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY??'')}&libraries=geometry&callback=initKyouMaps&loading=async&language=ja&v=quarterly`;
+    script.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=geometry&callback=initKyouMaps&loading=async&language=ja&v=quarterly`;
     script.async=true; script.onerror=()=>reject(new Error('地図を読み込めませんでした。通信・ブラウザーキーを確認してください。'));
     document.head.appendChild(script);
   });
   return load;
 }
-export default function MapView({result,selected,onSelect}:{result:SearchResult|null;selected:Destination|undefined;onSelect:(id:string)=>void}) {
+export default function MapView({result,selected,onSelect,mapsApiKey,showDemo}:{result:SearchResult|null;selected:Destination|undefined;onSelect:(id:string)=>void;mapsApiKey:string;showDemo:boolean}) {
   const root=useRef<HTMLDivElement>(null), map=useRef<google.maps.Map|null>(null);
   const [error,setError]=useState('');
   useEffect(()=>{
@@ -23,7 +23,7 @@ export default function MapView({result,selected,onSelect}:{result:SearchResult|
     const authFailure=()=>{if(!disposed)setError('地図の認証に失敗しました。キーの制限・課金設定を確認してください。');};
     window.addEventListener('kyou-maps-auth-error',authFailure);
     const timeout=setTimeout(()=>{if(!disposed)setError('地図の読み込みに時間がかかっています。通信・キー設定を確認してください。');},15000);
-    loadMaps().then(()=>{
+    loadMaps(mapsApiKey).then(()=>{
       if(disposed||!root.current) return;
       clearTimeout(timeout); setError('');
       // Reuse the map across selections to avoid additional map loads.
@@ -43,8 +43,9 @@ export default function MapView({result,selected,onSelect}:{result:SearchResult|
       instance.fitBounds(bounds,60);
     }).catch((e:Error)=>{if(!disposed){clearTimeout(timeout);setError(e.message);}});
     return ()=>{disposed=true;clearTimeout(timeout);overlays.forEach(o=>o.setMap(null));window.removeEventListener('kyou-maps-auth-error',authFailure);};
-  },[result,selected,onSelect]);
+  },[result,selected,onSelect,mapsApiKey]);
   if(result?.source==='google') return <div className="real-map"><div ref={root} className="google-canvas" aria-label="Google Mapsの目的地と推奨ルート"/>{error&&<div className="map-error" role="alert">{error}</div>}</div>;
+  if(!showDemo) return <div className="map-waiting">検索後に目的地と経路を表示します。</div>;
   const destinations=result?.destinations??[];
   const slots:[[number,number],[number,number],[number,number],[number,number],[number,number],[number,number],[number,number],[number,number]]=[[530,290],[470,400],[170,150],[260,370],[440,320],[340,230],[320,190],[400,140]];
   const target=selected?slots[Math.max(0,destinations.findIndex(p=>p.id===selected.id))%8]:slots[0];

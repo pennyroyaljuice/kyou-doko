@@ -1,5 +1,7 @@
 import Explorer from '@/components/Explorer';
+import { googleConfig } from '@/lib/runtime-config';
 export const dynamic = 'force-dynamic';
 export default function Page() {
-  return <Explorer liveAvailable={Boolean(process.env.GOOGLE_MAPS_API_KEY && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)} />;
+  const { serverKey, browserKey } = googleConfig();
+  return <Explorer liveAvailable={Boolean(serverKey && browserKey)} mapsApiKey={browserKey} />;
 }
