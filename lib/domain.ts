@@ -1,7 +1,7 @@
 export type Point = { lat: number; lng: number };
 export type Mode = 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK';
 export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean };
-export type Place = { id: string; name: string; description: string; category: string; point: Point; attributions?: { name: string; uri: string }[] };
+export type Place = { id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
 export type SearchResult = { source: 'demo' | 'google'; origin: Point; originLabel: string; input: SearchInput; destinations: Destination[]; notices: string[] };

@@ -16,3 +16,5 @@
 .account-link{font-size:11px;color:var(--green);text-decoration:underline;white-space:nowrap}.header-right{gap:15px}@media(max-width:560px){.account-link{font-size:10px}.header-right{gap:8px}.site-header .edition{font-size:8px;letter-spacing:0}}
 
 .highway-option{margin-top:12px}.highway-option label{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}.highway-option input{width:18px;height:18px;accent-color:#23664d;flex-shrink:0}.highway-option small{display:block;margin-top:5px;line-height:1.6}
+
+.destination-item{min-width:0}.destination-item .destination-card{width:100%;box-sizing:border-box}.spot-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.photo-credit{font-size:10px;line-height:1.5;color:#586b5d;padding:3px 9px 5px;overflow-wrap:anywhere}.photo-credit a{text-decoration:underline}.spot-number{z-index:1}

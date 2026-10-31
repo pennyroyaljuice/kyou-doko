@@ -56,3 +56,9 @@ Google OAuth設定を登録し、Googleログイン版を公開済みです。[�
 車では「高速道路を利用する」を切替できます（初期値ON）。OFFではGoogle RoutesのrouteModifiers.avoidHighways=trueを往路・復路へ渡し、取得した時間・距離で候補を絞ります。ONは高速の利用許可であり利用を強制しません。Googleの回避指定は完全な除外を保証せず、有料道路回避とは別条件です。探索は既存の最大50km・8候補の範囲内です。デモの数値は固定で設定による変化を模擬しません。Google Mapsリンクにもavoid=highwaysを渡します。Yahoo!連携は設定を引き継がないため外部側で確認します。
 
 公式仕様: https://developers.google.com/maps/documentation/routes/route-modifiers
+
+## 候補の参考写真
+
+通常検索のみ、既存Nearby Searchで写真情報を取得し、画面に入ったカードだけ最初の1枚を最大240×180pxで読み込みます。追加のPlace Detailsは呼びません。再抽選・選択では同じDOM内の写真を維持。画像と写真名は永続保存・キャッシュせずno-storeで配信し、失敗時はアイコンに戻して自動リトライしません。撮影者の表示・リンクを画像のすぐ下に配置します。公開デモは写真APIを使いません。
+
+写真取得経路は管理者認証と30分期限の署名済みチケットで制限し、任意URLを拒否。30回/分/IP（Cloudflare拠点単位）の制限を適用します。写真取得は追加のPlaces利用量となり、API別メール通知ではPlacesの合計に含まれます。

@@ -1,10 +1,11 @@
+import { servePhoto, type PhotoEnvironment } from '../lib/photos';
 import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
 import handler from 'vinext/server/fetch-handler';
 import { sanitizedHeaders } from '../lib/cloudflare-auth';
 import { authenticated, authPage, configured, expiredCookie, passwordMatches, sameOrigin, sessionCookie, type PasswordEnvironment } from '../lib/password-auth';
 const redirect=(location:string,cookie?:string)=>new Response(null,{status:303,headers:{Location:location,'Cache-Control':'no-store',...(cookie?{'Set-Cookie':cookie}:{})}});
 export default {
- async fetch(request:Request,env:Cloudflare.Env&PasswordEnvironment&GoogleAuthEnvironment,ctx:ExecutionContext) {
+ async fetch(request:Request,env:Cloudflare.Env&PasswordEnvironment&GoogleAuthEnvironment&PhotoEnvironment,ctx:ExecutionContext) {
   const url=new URL(request.url),path=url.pathname,headers=sanitizedHeaders(request),googleMode=env.ADMIN_AUTH_MODE==='google';
   if(path==='/admin/')return redirect('/admin');
   if(path==='/admin'||path.startsWith('/admin/')) {
@@ -38,6 +39,7 @@ export default {
     return new Response(null,{status:405});
    }
    if(!(googleMode?await googleAuthenticated(request,env):await authenticated(request,env)))return path.startsWith('/admin/api/')?new Response('管理者ログインが必要です。',{status:401,headers:{'Cache-Control':'no-store'}}):redirect('/admin/login');
+   if(path==='/admin/api/photo')return servePhoto(request,env);
    headers.set('oai-authenticated-user-id','password-owner');headers.set('oai-authenticated-user-email',env.LIVE_SEARCH_OWNER_EMAIL!);
   }
   const response=await handler.fetch(new Request(request,{headers}),env,ctx);

@@ -1,7 +1,8 @@
+import { photoTicket } from './photos';
 import { AppError, isPoint, type Point, type Place, type Leg, type Mode } from './domain';
 import type { DiscoveryProvider } from './providers';
-type GooglePlace = { id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
-const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.attributions';
+type GooglePlace = { photos?: {name:string;authorAttributions?:{displayName:string;uri?:string}[]}[]; id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
+const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.attributions,places.photos';
 export class GoogleProvider implements DiscoveryProvider {
   constructor(private key: string) {}
   private async request<T>(url: string, body: unknown, mask: string): Promise<T> {
@@ -30,7 +31,13 @@ export class GoogleProvider implements DiscoveryProvider {
     const data = await this.request<{places?:GooglePlace[]}>('https://places.googleapis.com/v1/places:searchNearby',{
       includedTypes:['tourist_attraction','park','national_park','beach','hiking_area','observation_deck'],maxResultCount:8,languageCode:'ja',rankPreference:'POPULARITY',locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
     },fields);
-    return (data.places??[]).filter(p=>p.location).map(p=>({id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri}))}));
+    return Promise.all((data.places??[]).filter(p=>p.location).map(async p=>({id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri})),photo:await this.photo(p)})));
+  }
+  private async photo(place:GooglePlace) {
+    const first=place.photos?.[0],secret=this.key;
+    if(!first||!secret)return undefined;
+    const ticket=await photoTicket(first.name,secret);
+    return ticket?{ticket,authors:(first.authorAttributions??[]).map(a=>({name:a.displayName,uri:a.uri}))}:undefined;
   }
   async route(origin: Point, destination: Point, mode: Mode, departure: Date, options?: { avoidHighways?: boolean }): Promise<Leg|null> {
     const waypoint = (p:Point)=>({location:{latLng:{latitude:p.lat,longitude:p.lng}}});
