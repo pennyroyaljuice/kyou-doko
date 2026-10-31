@@ -1,8 +1,9 @@
 'use client';
 import { useEffect,useRef,useState } from 'react';
 import { ArrowUpRight,Check,Clock3,Leaf,Mountain,Route,Waves } from 'lucide-react';
+import type {PlacePreference} from '@/lib/preferences';
 import type { Destination } from '@/lib/domain';
-export default function DestinationCard({destination:d,index,selected,onSelect,roundTrip}:{destination:Destination;index:number;selected:boolean;onSelect:(id:string)=>void;roundTrip:boolean}){
+export default function DestinationCard({destination:d,index,selected,onSelect,roundTrip,preference,preferenceDisabled,onPreference}:{destination:Destination;index:number;selected:boolean;onSelect:(id:string)=>void;roundTrip:boolean;preference?:PlacePreference;preferenceDisabled?:boolean;onPreference?:(kind:PlacePreference)=>void}){
  const holder=useRef<HTMLDivElement>(null),[visible,setVisible]=useState(false),[loaded,setLoaded]=useState(false),[failed,setFailed]=useState(false);
  useEffect(()=>{
   if(!d.photo||!holder.current)return;
@@ -17,5 +18,5 @@ export default function DestinationCard({destination:d,index,selected,onSelect,r
    <span className="spot-number">{String(index+1).padStart(2,'0')}</span>
   </span>
   <span className="spot-info"><span className="spot-category">{d.category}</span><strong>{d.name}</strong><span className="spot-description">{d.description}</span><span className="spot-stats"><span><Clock3 size={14}/>{Math.ceil(d.seconds/60)}分</span><span><Route size={14}/>{(d.meters/1000).toFixed(1)} km</span><span className="trip-tag">{roundTrip?'往復合計':'片道'}</span></span>{roundTrip&&<span className="spot-one-way">片道（往路） {(d.outbound.meters/1000).toFixed(1)} km</span>}</span><span className="selected-indicator">{selected?<Check size={16}/>:<ArrowUpRight size={17}/>}</span>
- </button>{loaded&&d.photo&&<div className="photo-credit">写真：Google Maps{d.photo.authors.map((a,i)=><span key={i}> · {a.uri&&/^https:\/\//.test(a.uri)?<a href={a.uri} target="_blank" rel="noopener noreferrer">{a.name}</a>:a.name}</span>)}</div>}</div>;
+ </button>{onPreference&&<div className="card-preferences" role="group" aria-label={d.name+'の登録'}>{(['visited','uninterested'] as const).map(kind=><label key={kind}><input type="checkbox" checked={preference===kind} disabled={preferenceDisabled} onChange={()=>onPreference(kind)}/>{kind==='visited'?'訪問済み':'興味なし'}</label>)}</div>}{loaded&&d.photo&&<div className="photo-credit">写真：Google Maps{d.photo.authors.map((a,i)=><span key={i}> · {a.uri&&/^https:\/\//.test(a.uri)?<a href={a.uri} target="_blank" rel="noopener noreferrer">{a.name}</a>:a.name}</span>)}</div>}</div>;
 }
