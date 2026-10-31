@@ -21,12 +21,14 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));
   }
-  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の4方向で候補を探索し、最大8スポットの経路を確認します。探索位置は目安で、実際の経路時間・距離が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
+  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の4か所で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大8スポットの経路を確認します。探索位置は目安で、実際の経路時間・距離が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
   if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。追加の自動検索は行いません。`);
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   const ranked=rank(items,input);
+  if(input.mode==='BICYCLE'&&places.length>0&&unavailable===places.length)throw new AppError('この地域では自転車の経路を取得できませんでした。Google Maps Platformは日本の自転車経路に未対応です。車または徒歩を選んでください。',422);
+  if(!ranked.length&&items.length)notices.push('取得できた経路はすべて指定した時間・距離の上限を超えました。往復は帰りの分も含みます。');
   if(ranked.length && (input.metric==='time'?ranked[0].seconds/60:ranked[0].meters/1000)<input.budget*0.75) notices.push('今回の候補は指定上限より短い移動に偏っています。道路網や候補分類・探索範囲の制限により、上限に近い候補を取得できない場合があります。');
   return {source:'google',origin:origin.point,originLabel:origin.label,input,destinations:ranked,notices};
 }
