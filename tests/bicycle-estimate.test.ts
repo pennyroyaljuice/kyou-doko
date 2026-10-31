@@ -1,0 +1,10 @@
+import {it,expect,vi} from 'vitest';
+import {estimateBicycleLeg} from '../lib/bicycle-estimate';
+import {search} from '../lib/search';
+const point={lat:35.68,lng:139.76};
+const place={id:'ChIJabcdefghijk',name:'公園',description:'',category:'公園',point};
+const input={source:'google' as const,origin:point,mode:'BICYCLE' as const,metric:'time' as const,budget:120,roundTrip:true};
+it('徒歩経路15kmを時速15kmで60分に換算し距離は維持',()=>{expect(estimateBicycleLeg({seconds:18000,meters:15000})).toEqual({seconds:3600,meters:15000});});
+it('往復とも徒歩APIで取得し各距離から推定、合算した時間で順位と上限を判定',async()=>{const route=vi.fn().mockResolvedValueOnce({seconds:20000,meters:15000}).mockResolvedValueOnce({seconds:18000,meters:12000});const r=await search(input,{resolve:async()=>({point,label:'東京駅'}),nearby:async()=>[place],route});expect(route.mock.calls.map(c=>c[2])).toEqual(['WALK','WALK']);expect(r.destinations[0].seconds).toBe(6480);expect(r.destinations[0].meters).toBe(27000);expect(r.notices.join('')).toContain('推定値');expect(r.notices.join('')).toContain('階段');});
+it('徒歩経路がなければ架空の自転車結果を返さない',async()=>{const r=await search(input,{resolve:async()=>({point,label:'東京駅'}),nearby:async()=>[place],route:async()=>null});expect(r.destinations).toEqual([]);});
+it('距離上限を超えた推定候補は除外',async()=>{const r=await search({...input,metric:'distance',budget:20},{resolve:async()=>({point,label:'東京駅'}),nearby:async()=>[place],route:async()=>({seconds:18000,meters:15000})});expect(r.destinations).toEqual([]);});

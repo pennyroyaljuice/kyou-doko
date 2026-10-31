@@ -33,7 +33,7 @@ export function rank(items: Destination[], input: SearchInput) {
   return items.filter(d => value(d) <= input.budget).sort((a,b) => value(b)-value(a));
 }
 export function radius(input: SearchInput) {
-  const speed = {DRIVE:50,TRANSIT:60,BICYCLE:18,WALK:4}[input.mode];
+  const speed = {DRIVE:50,TRANSIT:60,BICYCLE:15,WALK:4}[input.mode];
   const km = input.metric === 'distance' ? input.budget : input.budget / 60 * speed;
   return Math.max(100, Math.min(300000, km * 1000 / (input.roundTrip ? 2 : 1)));
 }

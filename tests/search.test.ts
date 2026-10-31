@@ -67,4 +67,3 @@ describe('デモとナビ',()=>{
  });
 });
 
-it('自転車で全経路が見つからなければ日本の対応制限を明示する',async()=>{const origin={lat:35.68,lng:139.76},place={id:'test',name:'公園',category:'公園',description:'',point:origin};await expect(search({...input,mode:'BICYCLE'},{resolve:async()=>({point:origin,label:'東京駅'}),nearby:async()=>[place],route:async()=>null})).rejects.toThrow('日本の自転車経路に未対応');});
