@@ -19,3 +19,7 @@ Sites公開版のローカルコードは隣の`kyou-doko-site`。Sites管理の
 - デプロイID：`appgdep_6ae5b76f52a88191ad58e5baf5d652fb`
 
 APIキー、node_modules、ビルド生成物はGitに含めていません。
+
+## 公開デモへの変更
+
+一般閲覧はデモのみ。本人はChatGPTログイン後に実検索可能です。Google API課金の対象は本人の実検索・実地図利用です。詳細は[PUBLIC_DEMO.md](PUBLIC_DEMO.md)を参照してください。
