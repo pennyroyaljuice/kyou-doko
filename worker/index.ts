@@ -22,12 +22,14 @@ export default {
    if(request.method!=='GET')return new Response(null,{status:405});
    try{const usage=await checkUsage(env,identity!.sub,'search',false);return Response.json(identity!.isOwner?usage:{remaining:usage.remaining,resetAt:usage.resetAt,limits:{userDaily:usage.limits.userDaily},allowed:usage.allowed,reason:usage.reason},{headers:{'Cache-Control':'no-store'}});}catch{return usageError();}
   }
-  if(path==='/api/maps-key'){
+  if(path==='/api/maps-key')return Response.json({error:'地図はEmbed版に移行しました。画面を再読み込みしてください。'},{status:410,headers:{'Cache-Control':'no-store'}});
+  if(path==='/api/embed-key'){
    if(request.method!=='POST')return new Response(null,{status:405});
    if(!sameOrigin(request))return new Response(null,{status:403});
    if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
    if(env.LIVE_SEARCH_ENABLED!=='true')return new Response(null,{status:503});
-   try{const usage=await checkUsage(env,identity!.sub,'map',true);if(!usage.allowed)return Response.json({error:usage.reason},{status:429});return Response.json({key:env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY??''},{headers:{'Cache-Control':'private, no-store'}});}catch{return usageError();}
+   if(!env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)return Response.json({error:'地図は準備中です。Google Mapsでご確認ください。'},{status:503});
+   return Response.json({key:env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY},{headers:{'Cache-Control':'private, no-store'}});
   }
   if(path==='/api/photo'||path==='/admin/api/photo'){
    if(!searchAccess)return new Response(null,{status:401});
