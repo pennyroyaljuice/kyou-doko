@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, EncryptJWT, jwtDecrypt, jwtVerify, SignJWT, type JWTVerifyGetKey } from 'jose';
-export type GoogleAuthEnvironment={GOOGLE_OAUTH_CLIENT_ID?:string;GOOGLE_OAUTH_CLIENT_SECRET?:string;ADMIN_SESSION_SECRET?:string;LIVE_SEARCH_OWNER_EMAIL?:string;GOOGLE_OWNER_SUB?:string;ADMIN_AUTH_MODE?:string};
+export type GoogleAuthEnvironment={GOOGLE_OAUTH_CLIENT_ID?:string;GOOGLE_OAUTH_CLIENT_SECRET?:string;ADMIN_SESSION_SECRET?:string;LIVE_SEARCH_OWNER_EMAIL?:string;GOOGLE_OWNER_SUB?:string;PUBLIC_SEARCH_ENABLED?:string;ADMIN_AUTH_MODE?:string};
 const encoder=new TextEncoder(),sessionName='__Host-kyou-google',flowName='__Host-kyou-oauth';
 const jwks=createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const cookie=(name:string,value:string,age:number,lax=false)=>`${name}=${value}; Path=/; HttpOnly; Secure; SameSite=${lax?'Lax':'Strict'}; Max-Age=${age}`;
@@ -22,7 +22,7 @@ export async function beginGoogleLogin(env:GoogleAuthEnvironment,origin:string){
 }
 export async function validateGoogleIdentity(token:string,nonce:string,env:GoogleAuthEnvironment,keys:JWTVerifyGetKey=jwks){
  const {payload}=await jwtVerify(token,keys,{issuer:['https://accounts.google.com','accounts.google.com'],audience:env.GOOGLE_OAUTH_CLIENT_ID,algorithms:['RS256'],requiredClaims:['sub','email','email_verified','exp','iat','nonce']});
- if(payload.nonce!==nonce||payload.email_verified!==true||typeof payload.sub!=='string'||typeof payload.email!=='string'||payload.email.toLowerCase()!==env.LIVE_SEARCH_OWNER_EMAIL?.trim().toLowerCase()||(env.GOOGLE_OWNER_SUB&&payload.sub!==env.GOOGLE_OWNER_SUB)||(payload.azp&&payload.azp!==env.GOOGLE_OAUTH_CLIENT_ID))throw Error('Owner identity mismatch');
+ if(payload.nonce!==nonce||payload.email_verified!==true||typeof payload.sub!=='string'||typeof payload.email!=='string'||(env.PUBLIC_SEARCH_ENABLED!=='true'&&payload.email.toLowerCase()!==env.LIVE_SEARCH_OWNER_EMAIL?.trim().toLowerCase())||(payload.email.toLowerCase()===env.LIVE_SEARCH_OWNER_EMAIL?.trim().toLowerCase()&&env.GOOGLE_OWNER_SUB&&payload.sub!==env.GOOGLE_OWNER_SUB)||(payload.azp&&payload.azp!==env.GOOGLE_OAUTH_CLIENT_ID))throw Error('Owner identity mismatch');
  return {sub:payload.sub,email:payload.email};
 }
 export async function finishGoogleLogin(request:Request,env:GoogleAuthEnvironment,fetcher:typeof fetch=fetch,keys?:JWTVerifyGetKey){
@@ -39,8 +39,10 @@ export async function finishGoogleLogin(request:Request,env:GoogleAuthEnvironmen
  const session=await new SignJWT({email:identity.email,version:version(env)}).setProtectedHeader({alg:'HS256'}).setSubject(identity.sub).setIssuer(url.origin).setAudience('kyou-google-admin').setIssuedAt().setExpirationTime('8h').sign(await key(env));
  return cookie(sessionName,session,28800);
 }
-export async function googleAuthenticated(request:Request,env:GoogleAuthEnvironment){
- if(!googleConfigured(env))return false;
- const token=readCookie(request,sessionName);if(!token)return false;
- try{const {payload}=await jwtVerify(token,await key(env),{issuer:new URL(request.url).origin,audience:'kyou-google-admin',algorithms:['HS256'],requiredClaims:['exp','iat','sub','email']});return payload.version===version(env)&&typeof payload.sub==='string'&&payload.email?.toString().toLowerCase()===env.LIVE_SEARCH_OWNER_EMAIL?.trim().toLowerCase()&&(!env.GOOGLE_OWNER_SUB||payload.sub===env.GOOGLE_OWNER_SUB);}catch{return false;}
+export async function googleSessionIdentity(request:Request,env:GoogleAuthEnvironment){
+ if(!googleConfigured(env))return null;
+ const token=readCookie(request,sessionName);if(!token)return null;
+ try{const {payload}=await jwtVerify(token,await key(env),{issuer:new URL(request.url).origin,audience:'kyou-google-admin',algorithms:['HS256'],requiredClaims:['exp','iat','sub','email']});if(payload.version!==version(env)||typeof payload.sub!=='string'||typeof payload.email!=='string')return null;const owner=payload.email.toLowerCase()===env.LIVE_SEARCH_OWNER_EMAIL?.trim().toLowerCase()&&(!env.GOOGLE_OWNER_SUB||payload.sub===env.GOOGLE_OWNER_SUB);return owner||env.PUBLIC_SEARCH_ENABLED==='true'?{sub:payload.sub,email:payload.email,isOwner:owner}:null;}catch{return null;}
 }
+
+export async function googleAuthenticated(request:Request,env:GoogleAuthEnvironment){return (await googleSessionIdentity(request,env))?.isOwner===true;}

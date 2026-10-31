@@ -15,6 +15,6 @@ export async function validateAccessToken(token:string|undefined,env:AccessEnvir
 }
 export function sanitizedHeaders(request:Request) {
   const headers=new Headers(request.headers);
-  for(const name of [...headers.keys()])if(name.startsWith('oai-authenticated-user-')||name.startsWith('x-kyou-user-'))headers.delete(name);
+  for(const name of [...headers.keys()])if(name.startsWith('oai-authenticated-user-')||name.startsWith('x-kyou-'))headers.delete(name);
   return headers;
 }

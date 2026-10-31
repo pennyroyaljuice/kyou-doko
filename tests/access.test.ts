@@ -28,6 +28,6 @@ describe('公開デモと実検索の権限分離',()=>{
   it('本人画面にだけ地図キーを渡し、サーバー秘密キーは渡さない',async()=>{
     vi.stubEnv('LIVE_SEARCH_OWNER_USER_ID','owner-id');vi.stubEnv('GOOGLE_MAPS_API_KEY','server-secret');vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY','browser-key');vi.stubEnv('LIVE_SEARCH_ENABLED','true');
     vi.mocked(headers).mockResolvedValue(new Headers({'oai-authenticated-user-id':'owner-id','oai-authenticated-user-email':'owner@example.test'}) as Awaited<ReturnType<typeof headers>>);
-    const page=await Page();expect(page.props.mapsApiKey).toBe('browser-key');expect(page.props.liveAvailable).toBe(true);expect(JSON.stringify(page.props)).not.toContain('server-secret');
+    const page=await Page();expect(page.props.mapsApiKey).toBe('');expect(page.props.liveAvailable).toBe(true);expect(JSON.stringify(page.props)).not.toContain('server-secret');
   });
 });

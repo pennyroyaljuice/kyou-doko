@@ -1,12 +1,55 @@
+export { UsageBudget } from './usage';
+import {checkUsage,type UsageEnvironment} from './usage';
+import {parseInput} from '../lib/domain';
 import { servePhoto, type PhotoEnvironment } from '../lib/photos';
-import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
+import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleSessionIdentity, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
 import handler from 'vinext/server/fetch-handler';
 import { sanitizedHeaders } from '../lib/cloudflare-auth';
 import { authenticated, authPage, configured, expiredCookie, passwordMatches, sameOrigin, sessionCookie, type PasswordEnvironment } from '../lib/password-auth';
 const redirect=(location:string,cookie?:string)=>new Response(null,{status:303,headers:{Location:location,'Cache-Control':'no-store',...(cookie?{'Set-Cookie':cookie}:{})}});
 export default {
- async fetch(request:Request,env:Cloudflare.Env&PasswordEnvironment&GoogleAuthEnvironment&PhotoEnvironment,ctx:ExecutionContext) {
+ async fetch(request:Request,env:Cloudflare.Env&PasswordEnvironment&GoogleAuthEnvironment&PhotoEnvironment&UsageEnvironment&{NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?:string},ctx:ExecutionContext) {
   const url=new URL(request.url),path=url.pathname,headers=sanitizedHeaders(request),googleMode=env.ADMIN_AUTH_MODE==='google';
+  const identity=googleMode?await googleSessionIdentity(request,env):null;
+  const searchAccess=!!identity&&(identity.isOwner||env.PUBLIC_SEARCH_ENABLED==='true');
+  if(searchAccess){headers.set('oai-authenticated-user-id',identity!.isOwner?'password-owner':identity!.sub);headers.set('oai-authenticated-user-email',identity!.email);}
+  const usageError=()=>Response.json({error:'利用回数を確認できないため検索を停止しています。時間をおいてお試しください。'},{status:503,headers:{'Cache-Control':'no-store'}});
+  if(path==='/login')return env.PUBLIC_SEARCH_ENABLED==='true'?authPage('',false,true,true):redirect('/admin/login');
+  if(path==='/logout')return redirect('/admin/logout');
+  if(path==='/api/usage'||path==='/admin/api/usage'){
+   if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+   if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
+   if(request.method!=='GET')return new Response(null,{status:405});
+   try{const usage=await checkUsage(env,identity!.sub,'search',false);return Response.json(identity!.isOwner?usage:{remaining:usage.remaining,resetAt:usage.resetAt,limits:{userDaily:usage.limits.userDaily},allowed:usage.allowed,reason:usage.reason},{headers:{'Cache-Control':'no-store'}});}catch{return usageError();}
+  }
+  if(path==='/api/maps-key'){
+   if(request.method!=='POST')return new Response(null,{status:405});
+   if(!sameOrigin(request))return new Response(null,{status:403});
+   if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+   if(env.LIVE_SEARCH_ENABLED!=='true')return new Response(null,{status:503});
+   try{const usage=await checkUsage(env,identity!.sub,'map',true);if(!usage.allowed)return Response.json({error:usage.reason},{status:429});return Response.json({key:env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY??''},{headers:{'Cache-Control':'private, no-store'}});}catch{return usageError();}
+  }
+  if(path==='/api/photo'||path==='/admin/api/photo'){
+   if(!searchAccess)return new Response(null,{status:401});
+   if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
+   return servePhoto(request,env,fetch,async()=>{try{return (await checkUsage(env,identity!.sub,'photo',true)).allowed;}catch{return false;}});
+  }
+  if((path==='/api/search'||path==='/admin/api/search')&&request.method==='POST'){
+   if(!sameOrigin(request))return Response.json({error:'このサイトの画面から検索してください。'},{status:403});
+   try{
+    if(Number(request.headers.get('Content-Length')??0)>4096)return new Response(null,{status:413});
+    const raw=await request.clone().text();if(raw.length>4096)return new Response(null,{status:413});
+    const input=parseInput(JSON.parse(raw));
+    if(input.source==='google'){
+     if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+     if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
+     if(env.LIVE_SEARCH_ENABLED!=='true')return Response.json({error:'検索は現在停止中です。'},{status:503});
+     const usage=await checkUsage(env,identity!.sub,'search',true);
+     if(!usage.allowed)return Response.json({error:usage.reason,remaining:usage.remaining,resetAt:usage.resetAt},{status:429,headers:{'Cache-Control':'no-store'}});
+     headers.set('x-kyou-budget-approved','true');
+    }
+   }catch(error){if(error instanceof SyntaxError)return Response.json({error:'入力形式が正しくありません。'},{status:400});if(error instanceof Error&&'status' in error)return Response.json({error:error.message},{status:Number(error.status)});return usageError();}
+  }
   if(path==='/admin/')return redirect('/admin');
   if(path==='/admin'||path.startsWith('/admin/')) {
    if(request.method!=='GET'&&request.method!=='HEAD'&&!sameOrigin(request))return new Response('送信元を確認できません。',{status:403});
@@ -18,11 +61,11 @@ export default {
    }
    if(googleMode&&path==='/admin/google/callback') {
     if(request.method!=='GET')return new Response(null,{status:405});
-    try{const cookie=await finishGoogleLogin(request,env);const response=new Response('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=/admin"><title>ログイン完了</title><p>ログインしました。<a href="/admin">管理画面へ進む</a></p></html>',{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store','Set-Cookie':cookie,'Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'"}});response.headers.append('Set-Cookie',clearGoogleFlow);response.headers.set('Referrer-Policy','no-referrer');return response;}
-    catch{const response=authPage('Google認証に失敗したか、管理者として許可されていないアカウントです。再度ログインしてください。',false,true);response.headers.append('Set-Cookie',clearGoogleFlow);return response;}
+    try{const cookie=await finishGoogleLogin(request,env);const landing=env.PUBLIC_SEARCH_ENABLED==='true'?'/':'/admin';const response=new Response('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url='+landing+'"><title>ログイン完了</title><p>ログインしました。<a href="'+landing+'">アプリへ進む</a></p></html>',{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store','Set-Cookie':cookie,'Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'"}});response.headers.append('Set-Cookie',clearGoogleFlow);response.headers.set('Referrer-Policy','no-referrer');return response;}
+    catch{const response=authPage('Google認証に失敗したか、現在許可されていないアカウントです。再度ログインしてください。',false,true,env.PUBLIC_SEARCH_ENABLED==='true');response.headers.append('Set-Cookie',clearGoogleFlow);return response;}
    }
    if(path==='/admin/login') {
-    if(googleMode)return request.method==='GET'?authPage(googleConfigured(env)?'':'Googleログインは準備中です。',false,true):new Response(null,{status:405});
+    if(googleMode)return request.method==='GET'?authPage(googleConfigured(env)?'':'Googleログインは準備中です。',false,true,env.PUBLIC_SEARCH_ENABLED==='true'):new Response(null,{status:405});
     if(request.method==='GET')return authPage(configured(env)?'':'管理者パスワードは未設定です。');
     if(request.method!=='POST')return new Response(null,{status:405});
     if(!configured(env)||!env.LOGIN_LIMITER)return new Response('管理者認証は準備中です。',{status:503});
@@ -39,7 +82,7 @@ export default {
     return new Response(null,{status:405});
    }
    if(!(googleMode?await googleAuthenticated(request,env):await authenticated(request,env)))return path.startsWith('/admin/api/')?new Response('管理者ログインが必要です。',{status:401,headers:{'Cache-Control':'no-store'}}):redirect('/admin/login');
-   if(path==='/admin/api/photo')return servePhoto(request,env);
+
    headers.set('oai-authenticated-user-id','password-owner');headers.set('oai-authenticated-user-email',env.LIVE_SEARCH_OWNER_EMAIL!);
   }
   const response=await handler.fetch(new Request(request,{headers}),env,ctx);

@@ -1,4 +1,4 @@
-export type Access = { signedIn: boolean; isOwner: boolean };
+export type Access = { signedIn: boolean; isOwner: boolean; canSearch: boolean };
 
 // These headers must be supplied/overwritten by the Cloudflare Worker after Access JWT verification.
 // Never deploy this app behind a proxy that forwards client-supplied identity.
@@ -11,7 +11,7 @@ export function requestAccess(headers: Pick<Headers, 'get'>): Access {
   // Prefer a site-scoped ID when configured. The initial owner allowlist comes
   // from the Cloudflare Access owner's verified email, never from request body/query fields.
   const isOwner = signedIn && Boolean(ownerId ? userId === ownerId : ownerEmail && email === ownerEmail);
-  return { signedIn, isOwner };
+  return { signedIn, isOwner, canSearch:isOwner||(signedIn&&process.env.PUBLIC_SEARCH_ENABLED==='true') };
 }
 
 export function liveEnabled() { return process.env.LIVE_SEARCH_ENABLED === 'true'; }

@@ -23,7 +23,14 @@ export default function MapView({result,selected,onSelect,mapsApiKey,showDemo}:{
     const authFailure=()=>{if(!disposed)setError('地図の認証に失敗しました。キーの制限・課金設定を確認してください。');};
     window.addEventListener('kyou-maps-auth-error',authFailure);
     const timeout=setTimeout(()=>{if(!disposed)setError('地図の読み込みに時間がかかっています。通信・キー設定を確認してください。');},15000);
-    loadMaps(mapsApiKey).then(()=>{
+    const authorize=async()=>{
+      if(map.current?.getDiv()===root.current)return;
+      const response=await fetch('/api/maps-key',{method:'POST',headers:{'Content-Type':'application/json'}});
+      const data=await response.json() as {key?:string;error?:string};
+      if(!response.ok||!data.key)throw new Error(data.error??'地図を読み込めませんでした。外部ナビをご利用ください。');
+      await loadMaps(data.key);
+    };
+    authorize().then(()=>{
       if(disposed||!root.current) return;
       clearTimeout(timeout); setError('');
       // Reuse the map across selections to avoid additional map loads.
