@@ -49,6 +49,7 @@ export default {
     if(Number(request.headers.get('Content-Length')??0)>4096)return new Response(null,{status:413});
     const raw=await request.clone().text();if(raw.length>4096)return new Response(null,{status:413});
     const input=parseInput(JSON.parse(raw));
+    if(input.source!=='google')return Response.json({error:'デモ検索は終了しました。Googleログイン後に検索してください。'},{status:410});
     if(input.source==='google'){
      if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
      if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});

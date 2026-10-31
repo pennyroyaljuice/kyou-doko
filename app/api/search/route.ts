@@ -19,11 +19,11 @@ export async function POST(request:Request) {
     let body:unknown;
     try { body=JSON.parse(raw); } catch { throw new AppError('入力形式が正しくありません。'); }
     const input = parseInput(body);
-    if (input.source === 'demo') return json(demoSearch(input));
+    if (input.source !== 'google') return json({error:'デモ検索は終了しました。Googleログイン後に検索してください。'},410);
     const access = requestAccess(request.headers);
-    if (!access.signedIn) throw new AppError('実検索にはGoogleログインが必要です。公開デモもご利用いただけます。',401);
-    if (!access.canSearch) throw new AppError('実検索は管理者のみ利用できます。公開デモをご利用ください。',403);
-    if (!liveEnabled()) throw new AppError('実検索は現在停止中です。公開デモをご利用ください。',503);
+    if (!access.signedIn) throw new AppError('実検索にはGoogleログインが必要です。',401);
+    if (!access.canSearch) throw new AppError('実検索は管理者のみ利用できます。',403);
+    if (!liveEnabled()) throw new AppError('実検索は現在停止中です。',503);
     if (request.headers.get('x-kyou-budget-approved')!=='true') throw new AppError('利用回数を確認できません。時間をおいてお試しください。',503);
     const { serverKey: key, browserKey } = googleConfig();
     if (!key || !browserKey) throw new AppError('現在地・任意地点からの検索は準備中です。Google MapsのAPI設定後に利用できます。',503);

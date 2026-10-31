@@ -17,8 +17,8 @@ describe('公開デモと実検索の権限分離',()=>{
   it('本人でも停止スイッチが無効ならGoogleへ接続しない',async()=>{
     vi.stubEnv('LIVE_SEARCH_OWNER_EMAIL','owner@example.test');vi.stubEnv('LIVE_SEARCH_ENABLED','false');const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const response=await POST(new Request('https://example.test/api/search',{method:'POST',headers:{'Content-Type':'application/json','oai-authenticated-user-id':'owner','oai-authenticated-user-email':'owner@example.test'},body:JSON.stringify(body)}));expect(response.status).toBe(503);expect(fetcher).not.toHaveBeenCalled();
   });
-  it('未ログインでもデモ検索でき、Googleを呼ばない',async()=>{
-    const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const response=await POST(new Request('https://example.test/api/search',{method:'POST',body:JSON.stringify({...body,source:'demo',origin:'東京駅',budget:120})}));expect(response.status).toBe(200);expect((await response.json() as {source:string}).source).toBe('demo');expect(fetcher).not.toHaveBeenCalled();
+  it('終了したデモ検索は410で拒否し、Googleを呼ばない',async()=>{
+    const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const response=await POST(new Request('https://example.test/api/search',{method:'POST',body:JSON.stringify({...body,source:'demo',origin:'東京駅',budget:120})}));expect(response.status).toBe(410);expect((await response.json() as {error:string}).error).toContain('終了');expect(fetcher).not.toHaveBeenCalled();
   });
   it('匿名画面へ地図キーや実検索権限を送らない',async()=>{
     vi.stubEnv('GOOGLE_MAPS_API_KEY','server-secret');vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY','browser-key');vi.stubEnv('LIVE_SEARCH_ENABLED','true');
