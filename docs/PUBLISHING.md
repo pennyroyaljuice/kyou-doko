@@ -10,9 +10,9 @@
 
 ## ソース
 
-このNext.js版はローカルGitのmainブランチに初期コミット済み。GitHubへの送信はGitHubの接続待ちです。
+GitHubリポジトリ： https://github.com/pennyroyaljuice/kyou-doko （非公開）。Next.js版は`main`ブランチ、Sites公開版は`sites`ブランチで管理します。
 
-Sites公開版のコードは隣の`kyou-doko-site`。Sites管理のGitソースへ同期済みです。GitHubへの送信とは別の保存先です。
+Sites公開版のローカルコードは隣の`kyou-doko-site`。Sites管理のGitソースとGitHubの`sites`ブランチの両方へ同期します。GitHubへのpushだけでWebアプリが自動更新される設定にはしていません。Web更新はSitesのビルド・保存・デプロイ手順で行います。
 
 - Site ID：`appgprj_6ae5b65bb77c81918af7418dad6366f2`
 - 公開元コミット：`a3469f9454a53b0f5f09af457fd8664175c6beb2`
