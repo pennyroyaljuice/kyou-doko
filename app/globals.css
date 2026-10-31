@@ -36,3 +36,5 @@
 .card-preferences{display:flex;justify-content:flex-end;gap:18px;padding:8px 12px;font-size:12px}.card-preferences label{display:flex;align-items:center;gap:5px;cursor:pointer}.saved-place-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}.saved-place{border:1px solid #dbe4dc;border-radius:8px;padding:12px}.saved-place h3{font-size:14px}.place-preferences .preference-actions{margin:12px 0}.place-preferences button[aria-pressed=true]{background:#dfece0;border-color:#477960}.saved-place iframe{display:block;min-width:200px}.header-right{flex-wrap:wrap}
 
 .estimate-tag{display:block;font-size:11px;color:#805b2c;margin:4px 0}.mode-coverage-note{font-size:12px;line-height:1.6;color:#805b2c;flex-basis:100%}
+
+.spot-stats .trip-summary{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.trip-summary>span{flex:none}
