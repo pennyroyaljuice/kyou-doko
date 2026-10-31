@@ -8,7 +8,7 @@ Next.js App Router形式 + React + TypeScript。公開版はSites提供のVinext
 app/page.tsx → POST /api/search → application search service
                                       ↓ DiscoveryProvider
                                   GoogleProvider / DemoProvider
-browser MapView → Maps JavaScript API（公開・制限キー）
+browser MapView → 認証済みPOST /api/embed-key → Maps Embed API place（Embed専用・リファラー制限キー）
 ```
 
 `lib/domain.ts`が入力検証・型・ランキング、`lib/providers.ts`がプロバイダー契約、`lib/google.ts`がGoogle HTTPアクセス、`lib/demo.ts`が完全分離した固定体験データ。`lib/search.ts`が起点解決・候補探索・往復計算を統合。外部ナビURLは`lib/navigation.ts`。将来データソースを変える際は提供元情報を維持しGoogleデータとOSM表示を混ぜない。
@@ -59,4 +59,11 @@ Googleの公式FAQではRoutes APIの公共交通対応から日本の事業者�
 
 ## 一般公開の準備（2026-11-01）
 
-Googleログイン・1日3回制限・共有の全体予算・写真と地図の制限を実装。Durable ObjectのSQLite保存とトランザクションで管理。公開スイッチは2026-11-01にONへ切替済み。詳細・初期上限・無料枠との関係・公開前の残作業・将来の課金設計は[一般公開の運用手順](docs/PUBLIC_LAUNCH.md)を参照。従来の管理者限定説明は公開スイッチOFF時の運用に限る。
+Googleログイン・1日3回制限・共有の全体予算・写真の制限を実装。Durable ObjectのSQLite保存とトランザクションで管理。公開スイッチは2026-11-01にONへ切替済み。詳細・初期上限・無料枠との関係・公開前の残作業・将来の課金設計は[一般公開の運用手順](docs/PUBLIC_LAUNCH.md)を参照。従来の管理者限定説明は公開スイッチOFF時の運用に限る。
+
+
+## 地図のEmbed移行（2026-11-01）
+
+選択した目的地をMaps Embed APIのplaceモードで表示する。全候補の独自ピン・経路線は表示せず、時間・距離は従来どおりサーバーのRoutes結果を一覧に表示する。詳細はGoogle Maps/Yahoo!カーナビへ渡す。ブラウザーキーはEmbed APIだけに制限する。キーは認証後のPOST /api/embed-keyで取得し、旧/api/maps-keyは410。無料の埋め込み表示には検索回数を消費しない。Routesにはポリラインを要求しない。既存環境変数名NEXT_PUBLIC_GOOGLE_MAPS_API_KEYを継続使用する。
+
+料金と検証の詳細：[Embed移行の費用比較](docs/EMBED_COST_REVIEW.md)。過去のJavaScript地図・地図発行上限に関する説明は移行前の記録。

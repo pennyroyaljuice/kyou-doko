@@ -55,11 +55,11 @@ export class GoogleProvider implements DiscoveryProvider {
       origin:waypoint(origin),destination:waypoint(destination),travelMode:mode,languageCode:'ja',units:'METRIC',computeAlternativeRoutes:false,
       ...(mode === 'DRIVE' ? {routingPreference:'TRAFFIC_UNAWARE',routeModifiers:{avoidHighways:options?.avoidHighways === true}} : {}),
 
-    },'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline');
+    },'routes.duration,routes.distanceMeters');
     const route = data.routes?.[0];
     if (!route) return null;
     const seconds = Number(route.duration?.replace(/s$/,''));
     if (!Number.isFinite(seconds) || !Number.isFinite(route.distanceMeters)) throw new AppError('Googleから有効な経路の時間・距離を取得できませんでした。',502);
-    return {seconds,meters:route.distanceMeters,polyline:route.polyline?.encodedPolyline};
+    return {seconds,meters:route.distanceMeters};
   }
 }

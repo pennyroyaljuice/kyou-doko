@@ -50,7 +50,7 @@ describe('実APIオーケストレーション',()=>{
  });
  it('指定移動手段とno-storeと最小フィールドをGoogleへ送る',async()=>{
   const f=vi.fn().mockResolvedValue(new Response(JSON.stringify({routes:[{duration:'120s',distanceMeters:500,polyline:{encodedPolyline:'abc'}}]}),{status:200}));vi.stubGlobal('fetch',f);
-  expect(await new GoogleProvider('test-key').route(place.point,place.point,'BICYCLE',new Date())).toEqual({seconds:120,meters:500,polyline:'abc'});
+  expect(await new GoogleProvider('test-key').route(place.point,place.point,'BICYCLE',new Date())).toEqual({seconds:120,meters:500});
   expect(JSON.parse(f.mock.calls[0][1].body).travelMode).toBe('BICYCLE');expect(f.mock.calls[0][1].cache).toBe('no-store');
  });
 });

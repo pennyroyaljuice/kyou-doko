@@ -23,11 +23,11 @@ describe('公開デモと実検索の権限分離',()=>{
   it('匿名画面へ地図キーや実検索権限を送らない',async()=>{
     vi.stubEnv('GOOGLE_MAPS_API_KEY','server-secret');vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY','browser-key');vi.stubEnv('LIVE_SEARCH_ENABLED','true');
     vi.mocked(headers).mockResolvedValue(new Headers() as Awaited<ReturnType<typeof headers>>);
-    const page=await Page();expect(page.props.mapsApiKey).toBe('');expect(page.props.liveAvailable).toBe(false);expect(JSON.stringify(page.props)).not.toContain('server-secret');
+    const page=await Page();expect(page.props.liveAvailable).toBe(false);expect(JSON.stringify(page.props)).not.toContain('server-secret');
   });
-  it('本人画面にだけ地図キーを渡し、サーバー秘密キーは渡さない',async()=>{
+  it('本人画面にもキーを埋め込まず、実検索権限だけを渡す',async()=>{
     vi.stubEnv('LIVE_SEARCH_OWNER_USER_ID','owner-id');vi.stubEnv('GOOGLE_MAPS_API_KEY','server-secret');vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY','browser-key');vi.stubEnv('LIVE_SEARCH_ENABLED','true');
     vi.mocked(headers).mockResolvedValue(new Headers({'oai-authenticated-user-id':'owner-id','oai-authenticated-user-email':'owner@example.test'}) as Awaited<ReturnType<typeof headers>>);
-    const page=await Page();expect(page.props.mapsApiKey).toBe('');expect(page.props.liveAvailable).toBe(true);expect(JSON.stringify(page.props)).not.toContain('server-secret');
+    const page=await Page();expect(page.props.liveAvailable).toBe(true);expect(JSON.stringify(page.props)).not.toContain('server-secret');
   });
 });

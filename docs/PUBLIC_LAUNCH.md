@@ -51,3 +51,8 @@ Googleの現行グローバル公示値: Nearby Search ProとText Search Proは�
 ## 一般公開の切替結果（2026-11-01）
 
 Google Auth Platformの公開ステータス「本番環境」を画面で確認。アプリのPUBLIC_SEARCH_ENABLED=trueをデプロイ。/loginが200でGoogleログインと1日3回の案内を表示し、匿名検索は401のまま。実Google OAuthでログインし、コールバックからルート画面へ戻ることを管理者アカウントで確認。一般アカウントの権限・3回制限・4回目拒否・管理者画面拒否は署名済みテスト用IDで検証済み。管理者以外の実Googleアカウントを用いた端末確認は利用者に依頼する。地図キーのAPI制限はMaps JavaScript APIのみ、許可リファラーに本番workers.devと旧Sitesドメインを確認。Google側の変更できない日次地図割当はそのままで、キー発行と写真・検索の共有上限を維持。請求ゼロの保証はしない。
+
+
+## Embed移行（2026-11-01）
+
+地図を無料・回数上限なしのMaps Embed API place表示へ変更。ブラウザーキーのMaps JavaScript API許可を外し、Maps Embed APIだけに限定。リファラー制限は維持。/api/maps-keyは410、/api/embed-keyは認証・同一オリジンを検証して返す。地図の共有カウンターは過去値を保持するが新規加算・上限判定はしない。検索と写真の共有上限は継続。[料金比較](EMBED_COST_REVIEW.md)参照。
