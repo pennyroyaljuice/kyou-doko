@@ -34,7 +34,7 @@ export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:
     setBusy(true);setError('');setResult(null);
     const input:SearchInput={source,origin:gps??origin,mode,metric,budget:Number(budget),roundTrip};
     try {
-      const response=await fetch('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
+      const response=await fetch(liveAccess?'/admin/api/search':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
       const data=await response.json() as SearchResult & {error?:string};
       if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
       setResult(data);setSelectedId(data.destinations[0]?.id??'');
@@ -48,7 +48,7 @@ export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:
   }
   const changeSource=(s:'demo'|'google')=>{if(s==='google'&&!liveAccess)return;reset();setSource(s);setGps(null);setGpsAccuracy(null);setOrigin(s==='demo'?'東京駅':'');};
   return <>
-    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>今日どこいく<span className="brand-question">？</span></a><div className="header-right"><span className="edition">{liveAccess?'管理者':'公開デモ'}</span>{signedIn?<a className="account-link" href="/signout-with-chatgpt?return_to=%2F" target="_top">ログアウト</a>:<a className="account-link" href="/signin-with-chatgpt?return_to=%2F" target="_top">管理者ログイン</a>}</div></header>
+    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>今日どこいく<span className="brand-question">？</span></a><div className="header-right"><span className="edition">{liveAccess?'管理者':'公開デモ'}</span>{signedIn?<a className="account-link" href="/admin/logout" target="_top">ログアウト</a>:<a className="account-link" href="/admin/" target="_top">管理者ログイン</a>}</div></header>
     <main>
       <section className="search-panel" aria-labelledby="search-heading">
         <div className="panel-top"><h1 id="search-heading"><SlidersHorizontal size={17}/>検索条件</h1><div className="source-switch" aria-label="データモード"><button aria-pressed={source==='demo'} onClick={()=>changeSource('demo')} disabled={busy||locating}>デモ</button><button aria-pressed={source==='google'} onClick={()=>changeSource('google')} disabled={!liveAccess||busy||locating} title={!liveAccess?'実検索は管理者のみ利用できます':!liveAvailable?'実API利用には環境変数の設定が必要です':undefined}>通常検索</button></div></div>
@@ -59,7 +59,7 @@ export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:
           <div className="condition trip-condition"><label><span className="step">04</span>移動区分</label><div className="trip-switch"><button type="button" aria-pressed={!roundTrip} onClick={()=>{reset();setRoundTrip(false);}}>片道 <ArrowRight size={15}/></button><button type="button" aria-pressed={roundTrip} onClick={()=>{reset();setRoundTrip(true);}}>往復 <RefreshCw size={14}/></button></div><small>{roundTrip?'行き＋帰りの合計で計算':'行きの移動だけで計算'}</small></div>
         </div><div className="search-bottom">{source==='google'&&<p>検索時、出発地点と条件をGoogleに送信します。</p>}<button className="search-button" type="submit" disabled={source==='google'&&!liveAvailable}>{busy?<><RefreshCw size={19} className="spin"/>探しています…</>:<>どこいく？ <ArrowRight size={19}/></>}</button></div></fieldset></form>
       </section>
-      {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/setup">設定手順</a></div>}
+      {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/admin/setup">設定手順</a></div>}
       <div className="mode-notice"><span className={source==='demo'?'demo-badge':'live-badge'}>{source==='demo'?'DEMO':liveAvailable?'LIVE':'準備中'}</span><span>{source==='demo'?'表示される時間・距離はサンプルです。実際の検索結果ではありません。':liveAvailable?'現在地は検索ボタンを押したときにGoogleへ送信します。':'位置情報はブラウザー内だけで保持し、現在は検索サービスへ送信しません。'}</span></div>
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>

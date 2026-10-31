@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kyou-doko",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "LIVE_SEARCH_ENABLED": "false"
+  },
+  "assets": {
+    "run_worker_first": [
+      "/admin*",
+      "/api/*",
+      "/setup"
+    ]
+  },
+  "observability": {
+    "enabled": false
+  }
+}

@@ -1,38 +1,18 @@
-import handler from "vinext/server/fetch-handler";
-import { runWithConnectorBinding } from "../lib/connector-context";
-import type { ConnectorBinding } from "../lib/connector-contract.mjs";
-
-const worker = {
-  async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
-    let binding = ctx.props?.CONNECTORS;
-    // Local preview emulates the same request-scoped capability. This branch and
-    // the auxiliary service binding are absent from production builds.
-    if (import.meta.env.DEV && !binding && env.CONNECTORS) {
-      const preview = env.CONNECTORS;
-      const expiresAt = Date.now() + 60_000;
-      binding = {
-        async getContext() {
-          if (Date.now() >= expiresAt) return { status: "request_context_expired" };
-          return preview.getContext?.() ?? { status: "binding_unavailable" };
-        },
-        async invoke(connectorId, actionName, args) {
-          if (Date.now() >= expiresAt) {
-            return { status: "request_context_expired", message: "This request has expired. Please try again." };
-          }
-          return preview.invoke(connectorId, actionName, args);
-        },
-      };
+import handler from 'vinext/server/fetch-handler';
+import { sanitizedHeaders, validateAccessToken, type AccessEnvironment } from '../lib/cloudflare-auth';
+export default {
+  async fetch(request:Request,env:Cloudflare.Env&AccessEnvironment,ctx:ExecutionContext) {
+    const pathname=new URL(request.url).pathname;
+    if(pathname==='/admin')return new Response(null,{status:302,headers:{Location:'/admin/','Cache-Control':'no-store'}});
+    if(pathname==='/admin/logout')return new Response(null,{status:302,headers:{Location:'/cdn-cgi/access/logout','Cache-Control':'no-store'}});
+    const headers=sanitizedHeaders(request);
+    if(pathname==='/admin'||pathname.startsWith('/admin/')) {
+      const identity=await validateAccessToken(request.headers.get('Cf-Access-Jwt-Assertion')??undefined,env);
+      if(!identity)return new Response('管理者ページにはCloudflare Accessの本人認証が必要です。公開デモは / から利用できます。',{status:403,headers:{'Content-Type':'text/plain;charset=utf-8','Cache-Control':'no-store'}});
+      headers.set('oai-authenticated-user-id',identity.id);headers.set('oai-authenticated-user-email',identity.email);
     }
-    const response = await runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
-    const pathname = new URL(request.url).pathname;
-    if (pathname === '/' || pathname === '/setup' || pathname.startsWith('/api/')) {
-      const guarded = new Response(response.body, response);
-      guarded.headers.set('Cache-Control', 'private, no-store');
-      guarded.headers.append('Vary', 'Cookie');
-      return guarded;
-    }
+    const response=await handler.fetch(new Request(request,{headers}),env,ctx);
+    if(!pathname.startsWith('/_next/')){const guarded=new Response(response.body,response);guarded.headers.set('Cache-Control','private, no-store');guarded.headers.append('Vary','Cookie');return guarded;}
     return response;
-  },
+  }
 };
-
-export default worker;

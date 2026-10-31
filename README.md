@@ -1,52 +1,64 @@
-# 今日どこいく？
+# 今日どこいく？ — Cloudflare単独公開版
 
-「目的地は決まっていない。でも、どこかへ行きたい。」時間・距離の上限から外出先を提案するWebアプリです。このディレクトリーはSites向けの公開版で、Next.js App Router互換のVinext + Cloudflare Workersを使用します。ローカルNext.js版は隣の`kyou-doko`です。
+このブランチはご自身のCloudflareアカウントへ配置するための版です。ChatGPT Sitesへの依存を外しています。既存Sites版は別ブランチsitesで維持します。
 
-## スマートフォンからの利用
+## 構成
 
-公開先はSitesで管理し、閲覧は所有者本人だけに制限します。スマートフォンで公開URLを開き、公開時と同じアカウントでログインしてください。APIキー未設定の現在はデモモードのみ利用できます。公開URLはデプロイ成功後にチャットへ記載します。
+- `/`：一般公開デモ。Googleの有料APIを呼ばず、地図用キーも送信しません。
+- `/admin/`：本人用。Cloudflare Accessの署名済みJWTを検証し、本人のみ実検索を許可。
+- `/admin/api/search`：本人用の実検索。一般向け`/api/search`から実検索することはできません。
+- 認証・Googleキー・有効化設定が揃うまで実検索は停止。新規公開時はデモだけで動作します。
 
-## 起動
-
-Node.js 22以上とpnpmを使用します。
-
-```sh
-pnpm install
-pnpm dev
-# http://localhost:5173
-```
-
-APIキーなしでデモが動作します。東京駅を起点とした固定の体験データで、実際の経路・時刻・営業状況ではありません。任意の出発地点やGPSを試す場合は実APIモードを設定してください。
-
-## 実APIの設定
-
-`.env.example`を`.env.local`へコピーし、Google Cloudで請求先を設定。Places API (New)、Routes API、Maps JavaScript APIを有効化します。
-
-- `GOOGLE_MAPS_API_KEY`: サーバー専用。Places / RoutesのAPI制限と、可能なら送信元IP制限を設定。
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`: ブラウザー公開キー。Maps JavaScript APIだけにAPI制限し、HTTPリファラーをlocalhostと自分のドメインに制限。公開変数にサーバーキーを入れないこと。
-- 両キーの設定時のみ実APIモードを選べます。地図の認証失敗や検索失敗をデモへ自動置換しません。
-- 環境変数はリクエスト時に読み取ります。変更後は開発サーバーを再起動し、Sitesは環境設定を反映して再デプロイします。
+## ローカル確認
 
 ```sh
+pnpm install --frozen-lockfile
 pnpm test
 pnpm typecheck
 pnpm build
 pnpm start
-# ビルド済みWorkerをlocalhost:8787で確認
 ```
 
-## できることと制約
+39件のテストに、偽造JWT・有効期限・発行元・対象アプリ・本人以外・偽の認証ヘッダーの拒否を含みます。ローカルの管理画面は実Access認証がないので403です。
 
-GPS（localhostまたはHTTPS）・住所/駅名/緯度経度、4移動手段、時間/距離、片道/往復、候補選択、再検索、地図、外部ナビ。往復は復路を別計算し合算、滞在時間はゼロとして扱います。公共交通は電車優先で徒歩・バスを含む場合があります。未提供地域・経路なしは結果を捏造せず通知します。
+## 自分のCloudflareへ公開
 
-候補探索は半径最大50km・最大8候補に限定。網羅的な到達圏検索ではありません。峠などPlacesに登録されていないスポットも見つかりません。渋滞・料金・営業時間は保証しません。周遊自動生成、復路の好み指定は将来機能です。
+```sh
+pnpm exec wrangler login
+pnpm exec wrangler whoami
+pnpm build
+pnpm deploy
+```
 
-Sitesの閲覧制限を維持してください。不特定多数へ公開する前には運営者情報と問い合わせ先の追加、規約・プライバシー文面の確認、認証・永続的レート制限・監視が必要です。プロセス内の制限は本番の課金防御には不十分です。APIキーのある状態での課金を伴う疎通試験は未実施です。キーはリポジトリに入れず、Sitesの環境変数へ設定します。キー変更時は環境設定を反映して再デプロイしてください。
+初回にアカウント選択が必要な場合は自分のアカウントを指定します。既存のkyou-doko Workerがある場合は上書きせず名前を変更してください。URLはデプロイ成功時に表示される `https://kyou-doko.<自分のサブドメイン>.workers.dev` です。まだデプロイしていない段階でURLを推測して公開済みと扱わないでください。
 
-詳細は[SPEC.md](SPEC.md)、[ARCHITECTURE.md](ARCHITECTURE.md)、[API調査](docs/API_RESEARCH.md)、[確認結果](docs/VALIDATION.md)を参照。
+有料プランへの変更は自動で行いません。現在の設定は実検索停止・プレビューURL無効です。Googleキーもデプロイ内容に含めません。
 
-現在地の実検索を有効にする手順：[Google Mapsの設定](docs/GOOGLE_SETUP.md)。現在地ボタンはキー未設定でも利用可能ですが、実際の候補・経路検索は設定完了まで無効です。
+## 本人限定の実検索を有効にする
 
-## 公開デモへの変更
+1. Cloudflare Zero Trustを開き、AccessにSelf-hostedアプリケーションを作成します。対象は新しいホスト名の `/admin/*`。一般デモのルート `/` 全体は保護しません。
+2. Allowポリシーで自分のメールアドレスだけを許可します。Everyoneは選ばないでください。ログイン方法はメールのワンタイムPIN等を設定できます。プラン・利用規約・請求条件は画面で確認し、不要な有料契約はしないでください。
+3. Accessのチームドメイン（`https://<team>.cloudflareaccess.com`）とアプリケーションAUDタグを確認します。
+4. Workerの環境変数・Secretsへ以下を設定します。
 
-一般閲覧はデモのみ。本人はChatGPTログイン後に実検索可能です。Google API課金の対象は本人の実検索・実地図利用です。詳細は[PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md)を参照してください。
+| 名前 | 内容 |
+|---|---|
+| CF_ACCESS_TEAM_DOMAIN | Accessのチームドメイン |
+| CF_ACCESS_AUD | AccessアプリのAUD |
+| LIVE_SEARCH_OWNER_EMAIL | 本人のメールアドレス |
+| LIVE_SEARCH_OWNER_USER_ID | 任意：Accessのsub。SitesのIDとは異なるのでコピーしない |
+| GOOGLE_MAPS_API_KEY | Places/Routes用の秘密キー |
+| NEXT_PUBLIC_GOOGLE_MAPS_API_KEY | 制限済み地図表示キー |
+
+キーはチャット・GitHubに貼らずSecretsへ登録します。Codexによる登録時は標準入力だけで渡し、キーの値をログや引数へ出しません。
+
+5. Google Cloudの地図表示キーのウェブサイト制限に、新URLの `https://kyou-doko.<自分のサブドメイン>.workers.dev/*` を追加します。旧URLを使う間は旧リファラーも残します。
+6. 認証・キー設定の確認後だけ `wrangler.jsonc` のLIVE_SEARCH_ENABLEDをtrueへ変えて再ビルド・再デプロイ。ダッシュボードだけで値を変えると次のWranglerデプロイでfalseへ戻るため、意図して設定を同期してください。
+
+Cloudflare Accessのゲートを通らず管理エンドポイントへ直接到達しても、Worker自身がJWTの署名・発行元・対象アプリ・期限・本人を検証して拒否します。外部からの認証ヘッダーは毎回削除し、検証後にだけ内部用の本人情報を設定します。
+
+## 移行状況
+
+移行用コード・テスト・ビルドとローカルでの匿名デモ動作を確認済み。Cloudflareログイン待ちのため、まだアカウントへのデプロイは完了していません。旧Sites公開URLは継続稼働しています。
+
+公式資料：[Workers URL](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)、[Access設定](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)、[JWTの検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)。
