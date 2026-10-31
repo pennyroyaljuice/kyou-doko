@@ -1,6 +1,7 @@
+import type { DestinationTheme } from './themes';
 export type Point = { lat: number; lng: number };
 export type Mode = 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK';
-export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean };
+export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean; theme?: DestinationTheme };
 export type Place = { id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
@@ -19,7 +20,8 @@ export function parseInput(v: unknown): SearchInput {
   const min = x.metric === 'time' ? 5 : 1, max = x.metric === 'time' ? 480 : 300;
   if (typeof x.budget !== 'number' || !Number.isFinite(x.budget) || x.budget < min || x.budget > max) throw new AppError(`上限は${min}〜${max}${x.metric === 'time' ? '分' : 'km'}で指定してください。`);
   if (x.avoidHighways !== undefined && typeof x.avoidHighways !== 'boolean') throw new AppError('高速道路の設定が正しくありません。');
-  return { avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
+  if (x.theme !== undefined && !['all','tourism','nature'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
+  return { theme:x.theme ?? 'all', avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
 }
 export function distance(a: Point, b: Point) {
   const r = Math.PI / 180, dlat = (b.lat-a.lat)*r, dlng = (b.lng-a.lng)*r;
