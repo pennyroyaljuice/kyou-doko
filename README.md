@@ -59,6 +59,10 @@ Cloudflare Accessのゲートを通らず管理エンドポイントへ直接到
 
 ## 移行状況
 
-移行用コード・テスト・ビルドとローカルでの匿名デモ動作を確認済み。Cloudflareログイン待ちのため、まだアカウントへのデプロイは完了していません。旧Sites公開URLは継続稼働しています。
+ご自身のCloudflareアカウントへデモ版を配置済みです。
+
+URL：https://kyou-doko.pennyroyal-juice.workers.dev/
+
+デモ検索8件、ホーム・CSSの200応答、未認証管理画面の403を確認。39件のテスト・型チェック・ビルド・アップロード検証成功。本人用実検索はCloudflare AccessとGoogleの新URL制限の設定待ちで、Googleキーは移行先へ登録していません。旧Sites公開URLと本人用実検索は継続稼働しています。
 
 公式資料：[Workers URL](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)、[Access設定](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)、[JWTの検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)。
