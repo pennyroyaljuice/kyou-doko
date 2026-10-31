@@ -2,6 +2,8 @@
 
 「目的地は決まっていない。でも、どこかへ行きたい。」時間・距離の上限から外出先を提案する、ローカル向けNext.js MVPです。
 
+スマートフォン用Web版：[今日どこいく？](https://kyou-doko-outing.radical-steamer.chatgpt.site)（所有者限定・同じChatGPTアカウントでログイン・現在はデモのみ）。[公開状況](docs/PUBLISHING.md)を参照。
+
 ## 起動
 
 Node.js 22以上とpnpmを使用します。
