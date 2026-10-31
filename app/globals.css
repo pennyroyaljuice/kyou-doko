@@ -38,3 +38,6 @@
 .estimate-tag{display:block;font-size:11px;color:#805b2c;margin:4px 0}.mode-coverage-note{font-size:12px;line-height:1.6;color:#805b2c;flex-basis:100%}
 
 .spot-stats .trip-summary{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.trip-summary>span{flex:none}
+
+/* Fit the short search label without reducing the touch target. */
+.search-button{width:auto;min-width:0;min-height:48px;gap:12px;padding:13px 24px;flex:none;white-space:nowrap}@media(max-width:560px){.search-button{align-self:flex-end;width:auto;min-height:48px;padding:13px 24px}}
