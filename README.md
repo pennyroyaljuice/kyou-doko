@@ -46,3 +46,7 @@ Sitesの閲覧制限を維持してください。不特定多数へ公開する
 詳細は[SPEC.md](SPEC.md)、[ARCHITECTURE.md](ARCHITECTURE.md)、[API調査](docs/API_RESEARCH.md)、[確認結果](docs/VALIDATION.md)を参照。
 
 現在地の実検索を有効にする手順：[Google Mapsの設定](docs/GOOGLE_SETUP.md)。現在地ボタンはキー未設定でも利用可能ですが、実際の候補・経路検索は設定完了まで無効です。
+
+## 公開デモへの変更
+
+一般閲覧はデモのみ。本人はChatGPTログイン後に実検索可能です。Google API課金の対象は本人の実検索・実地図利用です。詳細は[PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md)を参照してください。

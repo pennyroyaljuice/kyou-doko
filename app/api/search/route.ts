@@ -4,6 +4,7 @@ import { demoSearch } from '@/lib/demo';
 import { GoogleProvider } from '@/lib/google';
 import { search } from '@/lib/search';
 import { googleConfig } from '@/lib/runtime-config';
+import { requestAccess, liveEnabled } from '@/lib/access';
 export const runtime = 'nodejs';
 let active = false, last = 0, started = Date.now(), count = 0;
 const json = (value:unknown,status=200)=>NextResponse.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -19,6 +20,10 @@ export async function POST(request:Request) {
     try { body=JSON.parse(raw); } catch { throw new AppError('入力形式が正しくありません。'); }
     const input = parseInput(body);
     if (input.source === 'demo') return json(demoSearch(input));
+    const access = requestAccess(request.headers);
+    if (!access.signedIn) throw new AppError('実検索には管理者のログインが必要です。公開デモをご利用ください。',401);
+    if (!access.isOwner) throw new AppError('実検索は管理者のみ利用できます。公開デモをご利用ください。',403);
+    if (!liveEnabled()) throw new AppError('実検索は現在停止中です。公開デモをご利用ください。',503);
     const { serverKey: key, browserKey } = googleConfig();
     if (!key || !browserKey) throw new AppError('現在地・任意地点からの検索は準備中です。Google MapsのAPI設定後に利用できます。',503);
     if (Date.now()-started > 3600000) { started=Date.now(); count=0; }
