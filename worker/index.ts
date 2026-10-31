@@ -1,5 +1,6 @@
+import {excludedIds,type Preferences} from '../lib/preferences';
 export { UsageBudget } from './usage';
-import {checkUsage,type UsageEnvironment} from './usage';
+import {checkUsage,preferenceStore,type UsageEnvironment} from './usage';
 import {parseInput} from '../lib/domain';
 import { servePhoto, type PhotoEnvironment } from '../lib/photos';
 import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleSessionIdentity, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
@@ -14,6 +15,12 @@ export default {
   const searchAccess=!!identity&&(identity.isOwner||env.PUBLIC_SEARCH_ENABLED==='true');
   if(searchAccess){headers.set('oai-authenticated-user-id',identity!.isOwner?'password-owner':identity!.sub);headers.set('oai-authenticated-user-email',identity!.email);}
   const usageError=()=>Response.json({error:'利用回数を確認できないため検索を停止しています。時間をおいてお試しください。'},{status:503,headers:{'Cache-Control':'no-store'}});
+  if(path==='/api/preferences'){
+   if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+   if(!['GET','POST'].includes(request.method))return new Response(null,{status:405});
+   if(request.method==='POST'&&!sameOrigin(request))return new Response(null,{status:403});
+   try{const raw=request.method==='POST'?await request.text():undefined;if(raw&&raw.length>1024)return new Response(null,{status:413});const store=await preferenceStore(env,identity!.sub);const response=await store.fetch('https://usage.internal/preferences',{method:request.method,...(raw?{body:raw}:{})});return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'除外設定を読み込めませんでした。時間をおいてお試しください。'},{status:503});}
+  }
   if(path==='/login')return env.PUBLIC_SEARCH_ENABLED==='true'?authPage('',false,true,true):redirect('/admin/login');
   if(path==='/logout')return redirect('/admin/logout');
   if(path==='/api/usage'||path==='/admin/api/usage'){
@@ -46,6 +53,8 @@ export default {
      if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
      if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
      if(env.LIVE_SEARCH_ENABLED!=='true')return Response.json({error:'検索は現在停止中です。'},{status:503});
+     const store=await preferenceStore(env,identity!.sub);const prefsResponse=await store.fetch('https://usage.internal/preferences');if(!prefsResponse.ok)throw Error('Preferences unavailable');
+     headers.set('x-kyou-excluded-places',JSON.stringify(excludedIds(await prefsResponse.json() as Preferences)));
      const usage=await checkUsage(env,identity!.sub,'search',true);
      if(!usage.allowed)return Response.json({error:usage.reason,remaining:usage.remaining,resetAt:usage.resetAt},{status:429,headers:{'Cache-Control':'no-store'}});
      headers.set('x-kyou-budget-approved','true');

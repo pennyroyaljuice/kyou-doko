@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints
 import type { Mode, Point, SearchInput, SearchResult } from '@/lib/domain';
 import { themeLabels, type DestinationTheme } from '@/lib/themes';
 import { googleMapsUrl } from '@/lib/navigation';
+import PlacePreferences from './PlacePreferences';
 import MapView from './MapView';
 import DestinationCard from './DestinationCard';
 import YahooNavigation from './YahooNavigation';
@@ -72,6 +73,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       {signedIn&&usage&&<div className="usage-notice" role="status">無料プラン · 本日の検索 あと{usage.remaining}回 / 5回（日本時間0時更新）{isOwner&&usage.rolling&&<span> · 全体：本日{usage.dailySearches}/20回、直近32日{usage.rolling.search}/200回 · 写真{usage.rolling.photo}/500 · 埋め込み地図は無料表示</span>}<small>検索開始時に消費します。0件・通信失敗でも回数は戻りません。サービス全体の上限で停止する場合があります。</small>{isOwner&&<button className="text-button" onClick={()=>void refreshUsage()}>利用状況を更新</button>}</div>}
       {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/admin/setup">設定手順</a></div>}
       <div className="mode-notice"><span className={source==='demo'?'demo-badge':'live-badge'}>{source==='demo'?'DEMO':liveAvailable?'LIVE':'準備中'}</span><span>{source==='demo'?'表示される時間・距離はサンプルです。実際の検索結果ではありません。':liveAvailable?'現在地は検索ボタンを押したときにGoogleへ送信します。':'位置情報はブラウザー内だけで保持し、現在は検索サービスへ送信しません。'}</span></div>
+      {signedIn&&<PlacePreferences selected={result?.source==='google'?selected:undefined} onExcluded={ids=>{if(result?.source!=='google')return;const destinations=result.destinations.filter(d=>!ids.includes(d.id));setResult({...result,destinations});if(ids.includes(selectedId))setSelectedId(destinations[0]?.id??'');}}/>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
         <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>

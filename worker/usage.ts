@@ -1,7 +1,13 @@
+import {emptyPreferences,updatePreferences,type Preferences} from '../lib/preferences';
 import {decideUsage,type UsageKind,type UsageState} from '../lib/usage-policy';
 export class UsageBudget {
  constructor(private state:DurableObjectState){}
  async fetch(request:Request){
+  if(new URL(request.url).pathname==='/preferences'){
+   if(request.method==='GET')return Response.json(await this.state.storage.get<Preferences>('preferences')??emptyPreferences());
+   if(request.method!=='POST')return new Response(null,{status:405});
+   try{const body=await request.json();const result=await this.state.storage.transaction(async tx=>{const next=updatePreferences(await tx.get<Preferences>('preferences')??emptyPreferences(),body);await tx.put('preferences',next);return next;});return Response.json(result);}catch(e){return Response.json({error:e instanceof Error?e.message:'保存できませんでした。'},{status:400});}
+  }
   const body=await request.json() as {subject:string;kind:UsageKind;reserve:boolean};
   if(!/^[a-f0-9]{64}$/.test(body.subject)||!['search','photo','map'].includes(body.kind)||typeof body.reserve!=='boolean')return new Response(null,{status:400});
   const result=await this.state.storage.transaction(async tx=>{const state=await tx.get<UsageState>('usage')??{days:{}};const result=decideUsage(state,body.subject,body.kind,Date.now(),body.reserve);await tx.put('usage',state);return result;});
@@ -21,4 +27,11 @@ export async function checkUsage(env:UsageEnvironment,sub:string,kind:UsageKind,
  const response=await env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('global-v1')).fetch('https://usage.internal/',{method:'POST',body:JSON.stringify({subject,kind,reserve})});
  if(!response.ok)throw Error('Usage budget unavailable');
  return response.json() as Promise<ReturnType<typeof decideUsage>>;
+}
+
+export async function preferenceStore(env:UsageEnvironment,sub:string){
+ if(!env.USAGE_BUDGET)throw Error('Preferences unavailable');
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));
+ const id=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+ return env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('preferences-v1:'+id));
 }

@@ -109,3 +109,10 @@ Googleログイン・1日5回制限・共有の全体予算・写真の制限を
 選択した目的地をMaps Embed APIのplaceモードで表示する。全候補の独自ピン・経路線は表示せず、時間・距離は従来どおりサーバーのRoutes結果を一覧に表示する。詳細はGoogle Maps/Yahoo!カーナビへ渡す。ブラウザーキーはEmbed APIだけに制限する。キーは認証後のPOST /api/embed-keyで取得し、旧/api/maps-keyは410。無料の埋め込み表示には検索回数を消費しない。Routesにはポリラインを要求しない。既存環境変数名NEXT_PUBLIC_GOOGLE_MAPS_API_KEYを継続使用する。
 
 料金と検証の詳細：[Embed移行の費用比較](docs/EMBED_COST_REVIEW.md)。過去のJavaScript地図・地図発行上限に関する説明は移行前の記録。
+
+
+## アカウント別の候補除外（2026-11-01）
+
+Googleログイン後、訪問済み・興味なしを場所ID単位で記録。訪問済み除外は切替可能、興味なしは常に除外。設定欄からGoogle Mapsで場所を確認・解除できる。名称・住所・写真は永続保存しない。上限500件、解除まで保持。保存・解除は検索回数を消費しない。デモは保存対象外。
+
+同じSQLite Durable Objectクラスを再利用し、Google subのSHA-256を含む専用インスタンス名preferences-v1にアカウントごとに分離。検索前にサーバーが取得し、偽装不可の内部ヘッダーで渡して経路計算前に除外。取得失敗時は検索を開始せず利用回数も消費しない。候補減少時の追加自動検索はしない。場所ID保存はPlacesのキャッシュ制限の例外を利用する（https://developers.google.com/maps/documentation/places/web-service/policies）。
