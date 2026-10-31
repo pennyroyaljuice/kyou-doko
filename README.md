@@ -46,3 +46,7 @@ pnpm deploy
 将来の課金会員はGoogle等のアカウント認証と会員・契約管理へ拡張します。現在の単一管理者パスワードを会員全員で共有する設計にはしません。
 
 公式資料: [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)、[Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)。
+
+## Googleアカウント認証への移行
+
+実装は準備済みです。[設定手順](docs/GOOGLE_LOGIN.md)に従ってOAuthクライアントを登録し、ADMIN_AUTH_MODE=googleへ切り替えます。設定完了までは現在のパスワード認証を維持します。Googleモードでは旧パスワード認証を受け付けません。

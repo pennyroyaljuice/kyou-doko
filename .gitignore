@@ -45,3 +45,7 @@ yarn-error.log*
 .DS_Store
 
 !.env.example
+
+# Downloaded OAuth client credentials
+client_secret*.json
+.google-oauth*.json
