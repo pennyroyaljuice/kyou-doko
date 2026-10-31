@@ -9,3 +9,12 @@ export function googleMapsUrl(origin:Point,destination:Point,mode:Mode,waypoints
 export function yahooUrl(destination:Point,name:string) {
   return `yjcarnavi://navi/select?${new URLSearchParams({lat:String(destination.lat),lon:String(destination.lng),name})}`;
 }
+
+export function yahooRouteUrl(origin:Point|'current',destination:Point,name:string,originName='出発地点',waypoints:{point:Point;name:string}[]=[]) {
+  if(waypoints.length>3) throw new Error('Yahoo!カーナビの経由地は3件までです。');
+  const q=new URLSearchParams();
+  q.append('point',origin==='current'?'current':coord(origin)+','+originName);
+  for(const via of waypoints)q.append('point',coord(via.point)+','+via.name);
+  q.append('point',coord(destination)+','+name);
+  return 'yjcarnavi://navi/select?'+q;
+}
