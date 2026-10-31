@@ -10,7 +10,7 @@
 
 ## ソース
 
-GitHubリポジトリ： https://github.com/pennyroyaljuice/kyou-doko （非公開）。Next.js版は`main`ブランチ、Sites公開版は`sites`ブランチで管理します。
+GitHubリポジトリ： https://github.com/pennyroyaljuice/kyou-doko （公開）。Next.js版は`main`ブランチ、Sites公開版は`sites`ブランチで管理します。2026-10-31にユーザー指定でリポジトリを公開へ変更。Webアプリの閲覧範囲は所有者限定を維持しています。
 
 Sites公開版のローカルコードは隣の`kyou-doko-site`。Sites管理のGitソースとGitHubの`sites`ブランチの両方へ同期します。GitHubへのpushだけでWebアプリが自動更新される設定にはしていません。Web更新はSitesのビルド・保存・デプロイ手順で行います。
 

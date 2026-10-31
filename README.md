@@ -4,7 +4,7 @@
 
 スマートフォン用Web版：[今日どこいく？](https://kyou-doko-outing.radical-steamer.chatgpt.site)（所有者限定・同じChatGPTアカウントでログイン・現在はデモのみ）。[公開状況](docs/PUBLISHING.md)を参照。
 
-GitHub：[pennyroyaljuice/kyou-doko](https://github.com/pennyroyaljuice/kyou-doko)（非公開）。`main`はNext.js版、`sites`は現在のWeb公開元です。GitHubへのpushによる自動デプロイは未設定です。
+GitHub：[pennyroyaljuice/kyou-doko](https://github.com/pennyroyaljuice/kyou-doko)（公開）。`main`はNext.js版、`sites`は現在のWeb公開元です。Webアプリの閲覧は引き続き所有者限定です。GitHubへのpushによる自動デプロイは未設定です。
 
 ## 起動
 
