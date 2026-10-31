@@ -32,11 +32,11 @@ export class GoogleProvider implements DiscoveryProvider {
     },fields);
     return (data.places??[]).filter(p=>p.location).map(p=>({id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri}))}));
   }
-  async route(origin: Point, destination: Point, mode: Mode, departure: Date): Promise<Leg|null> {
+  async route(origin: Point, destination: Point, mode: Mode, departure: Date, options?: { avoidHighways?: boolean }): Promise<Leg|null> {
     const waypoint = (p:Point)=>({location:{latLng:{latitude:p.lat,longitude:p.lng}}});
     const data = await this.request<{routes?:{duration:string;distanceMeters:number;polyline?:{encodedPolyline:string}}[]}>('https://routes.googleapis.com/directions/v2:computeRoutes',{
       origin:waypoint(origin),destination:waypoint(destination),travelMode:mode,languageCode:'ja',units:'METRIC',computeAlternativeRoutes:false,
-      ...(mode === 'DRIVE' ? {routingPreference:'TRAFFIC_UNAWARE'} : {}),
+      ...(mode === 'DRIVE' ? {routingPreference:'TRAFFIC_UNAWARE',routeModifiers:{avoidHighways:options?.avoidHighways === true}} : {}),
       ...(mode === 'TRANSIT' ? {departureTime:departure.toISOString(),transitPreferences:{allowedTravelModes:['TRAIN','SUBWAY','LIGHT_RAIL','RAIL']}} : {})
     },'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline');
     const route = data.routes?.[0];

@@ -17,5 +17,5 @@ export function demoSearch(input:SearchInput):SearchResult {
     const seconds = input.mode === 'DRIVE' ? p.minutes*60 : input.mode === 'TRANSIT' ? (p.minutes+12)*60 : meters / (input.mode === 'WALK' ? 4.5 : 16) * 3.6;
     return totals(p,{meters,seconds},input.roundTrip?{meters:meters*1.03,seconds:seconds*1.08}:undefined);
   });
-  return {source:'demo',origin:demoOrigin,originLabel:'東京駅（デモ固定）',input,destinations:rank(all,input),notices:['すべて操作確認用のデモ数値です。実際の経路検索・時刻・距離ではありません。']};
+  return {source:'demo',origin:demoOrigin,originLabel:'東京駅（デモ固定）',input,destinations:rank(all,input),notices:[...(input.mode === 'DRIVE' ? ['デモの時間・距離は固定サンプルです。高速道路設定による経路・到達範囲の変化は通常検索で確認してください。'] : []),'すべて操作確認用のデモ数値です。実際の経路検索・時刻・距離ではありません。']};
 }

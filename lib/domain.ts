@@ -1,6 +1,6 @@
 export type Point = { lat: number; lng: number };
 export type Mode = 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK';
-export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean };
+export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean };
 export type Place = { id: string; name: string; description: string; category: string; point: Point; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
@@ -18,7 +18,8 @@ export function parseInput(v: unknown): SearchInput {
   if (!(typeof x.origin === 'string' ? x.origin.trim().length > 0 && x.origin.length <= 200 : isPoint(x.origin))) throw new AppError('出発地点を入力してください（200文字以内）。');
   const min = x.metric === 'time' ? 5 : 1, max = x.metric === 'time' ? 480 : 300;
   if (typeof x.budget !== 'number' || !Number.isFinite(x.budget) || x.budget < min || x.budget > max) throw new AppError(`上限は${min}〜${max}${x.metric === 'time' ? '分' : 'km'}で指定してください。`);
-  return { source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
+  if (x.avoidHighways !== undefined && typeof x.avoidHighways !== 'boolean') throw new AppError('高速道路の設定が正しくありません。');
+  return { avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
 }
 export function distance(a: Point, b: Point) {
   const r = Math.PI / 180, dlat = (b.lat-a.lat)*r, dlng = (b.lng-a.lng)*r;

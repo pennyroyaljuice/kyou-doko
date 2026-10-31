@@ -10,15 +10,16 @@ export async function search(input:SearchInput, provider:DiscoveryProvider):Prom
   for (let i=0;i<places.length;i+=2) {
     const batch = await Promise.all(places.slice(i,i+2).map(async p=>{
       if (input.metric === 'distance' && distance(origin.point,p.point)*(input.roundTrip?2:1)>input.budget*1000) return null;
-      const outbound = await provider.route(origin.point,p.point,input.mode,start);
+      const outbound = await provider.route(origin.point,p.point,input.mode,start,{avoidHighways:input.mode === 'DRIVE' && input.avoidHighways === true});
       if (!outbound) { unavailable++; return null; }
-      const inbound = input.roundTrip ? await provider.route(p.point,origin.point,input.mode,new Date(start.getTime()+outbound.seconds*1000)) : undefined;
+      const inbound = input.roundTrip ? await provider.route(p.point,origin.point,input.mode,new Date(start.getTime()+outbound.seconds*1000),{avoidHighways:input.mode === 'DRIVE' && input.avoidHighways === true}) : undefined;
       if (input.roundTrip && !inbound) { unavailable++; return null; }
       return totals(p,outbound,inbound??undefined);
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));
   }
   const notices = ['最大50km圏内・最大8スポットの探索です。すべての到達可能地点を網羅するものではありません。'];
+  if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   if (input.mode === 'TRANSIT') notices.push('鉄道を優先する公共交通です。徒歩や他の交通機関を含む場合があります。復路は到着直後（滞在ゼロ）の出発で計算します。');
   return {source:'google',origin:origin.point,originLabel:origin.label,input,destinations:rank(items,input),notices};
