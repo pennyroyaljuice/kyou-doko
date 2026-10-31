@@ -1,0 +1,70 @@
+'use client';
+import { useCallback, useState } from 'react';
+import { ArrowDown, ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Sparkles, TrainFront, Waves, X } from 'lucide-react';
+import type { Mode, Point, SearchInput, SearchResult } from '@/lib/domain';
+import { googleMapsUrl, yahooUrl } from '@/lib/navigation';
+import MapView from './MapView';
+const modes = [{id:'DRIVE',name:'車',icon:Car},{id:'TRANSIT',name:'電車',icon:TrainFront},{id:'BICYCLE',name:'自転車',icon:Bike},{id:'WALK',name:'徒歩',icon:Footprints}] as const;
+const minutes=(s:number)=>`${Math.ceil(s/60)}分`;
+const km=(m:number)=>`${(m/1000).toFixed(1)} km`;
+export default function Explorer({liveAvailable}:{liveAvailable:boolean}) {
+  const [source,setSource]=useState<'demo'|'google'>('demo'), [origin,setOrigin]=useState('東京駅'),[gps,setGps]=useState<Point|null>(null);
+  const [mode,setMode]=useState<Mode>('DRIVE'),[metric,setMetric]=useState<'time'|'distance'>('time'),[budget,setBudget]=useState('120'),[roundTrip,setRoundTrip]=useState(true);
+  const [result,setResult]=useState<SearchResult|null>(null),[selectedId,setSelectedId]=useState(''),[view,setView]=useState<'list'|'map'>('list'),[busy,setBusy]=useState(false),[locating,setLocating]=useState(false),[error,setError]=useState('');
+  const selected=result?.destinations.find(d=>d.id===selectedId);
+  const onSelect=useCallback((id:string)=>setSelectedId(id),[]);
+  const reset=()=>{setResult(null);setSelectedId('');setError('');};
+  function locate() {
+    if(!navigator.geolocation){setError('このブラウザーは位置情報に対応していません。出発地点を手入力できます。');return;}
+    setLocating(true);setError('');
+    navigator.geolocation.getCurrentPosition(p=>{setLocating(false);reset();setGps({lat:p.coords.latitude,lng:p.coords.longitude});setOrigin('現在地');},()=>{setLocating(false);setError('現在地を取得できませんでした。駅名・住所を入力して利用できます。');},{timeout:10000,maximumAge:60000,enableHighAccuracy:false});
+  }
+  async function submit() {
+    setBusy(true);setError('');setResult(null);
+    const input:SearchInput={source,origin:gps??origin,mode,metric,budget:Number(budget),roundTrip};
+    try {
+      const response=await fetch('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
+      setResult(data);setSelectedId(data.destinations[0]?.id??'');
+    } catch(e) {setError(e instanceof Error&&e.name!=='TimeoutError'?e.message:'検索がタイムアウトしました。時間をあけて再試行してください。');}
+    finally {setBusy(false);}
+  }
+  function shuffle() {
+    if(!result||result.destinations.length<2)return;
+    const destinations=[...result.destinations.slice(1),result.destinations[0]];
+    setResult({...result,destinations});setSelectedId(destinations[0].id);
+  }
+  const changeSource=(s:'demo'|'google')=>{reset();setSource(s);setGps(null);setOrigin(s==='demo'?'東京駅':'');};
+  return <>
+    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>今日どこいく<span className="brand-question">？</span></a><div className="header-right"><span className="header-note">気ままな寄り道、見つけよう。</span><span className="edition">BETA</span></div></header>
+    <main>
+      <section className="intro"><div><div className="eyebrow"><span/> A LITTLE ESCAPE, ANY DAY.</div><h1>行き先は、<br className="mobile-break"/>気分で決めよう。</h1><p>目的地は決まっていない。でも、どこかへ行きたい。<br/>あなたの「ちょうどいい距離」に、小さな冒険を。</p></div><div className="hero-art" aria-hidden="true"><svg viewBox="0 0 420 175"><circle cx="300" cy="48" r="29" fill="#efd49c"/><path d="M20 146L110 44 190 127 240 72 335 146Z" fill="#dce5d9"/><path d="M134 146L244 39 355 146Z" fill="#bacdbd"/><path d="M244 39L220 63 241 57 254 68 267 62Z" fill="#fafaf4"/><path d="M35 150Q110 130 180 150T390 146" fill="none" stroke="#8aa78f" strokeWidth="2"/><path d="M250 164Q180 140 233 127T235 101" fill="none" stroke="#fff" strokeWidth="10"/><path d="M322 123V89M310 106L322 84 334 106Z" fill="#5b806d" stroke="#5b806d" strokeWidth="3"/><path d="M80 149V113M69 132L80 105 91 132Z" fill="#5b806d" stroke="#5b806d" strokeWidth="3"/><path d="M185 85Q150 10 97 35" stroke="#bca98b" strokeWidth="1.5" strokeDasharray="4 5" fill="none"/><circle cx="95" cy="35" r="4" fill="#dc8257"/></svg><span>いつもの日常から、ちょっと外へ。</span></div></section>
+      <section className="search-panel" aria-labelledby="search-heading">
+        <div className="panel-top"><h2 id="search-heading"><SlidersHorizontal size={17}/>お出かけの条件</h2><div className="source-switch" aria-label="データモード"><button aria-pressed={source==='demo'} onClick={()=>changeSource('demo')} disabled={busy||locating}>デモ体験</button><button aria-pressed={source==='google'} onClick={()=>changeSource('google')} disabled={!liveAvailable||busy||locating} title={!liveAvailable?'実API利用には環境変数の設定が必要です':undefined}>実API検索</button></div></div>
+        <form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={busy||locating}><div className="conditions">
+          <div className="condition origin-condition"><label htmlFor="origin"><span className="step">01</span>出発地点</label><div className="input-box"><MapPin size={18}/><input id="origin" value={origin} placeholder="駅名・住所・緯度,経度" readOnly={source==='demo'} onChange={e=>{reset();setGps(null);setOrigin(e.target.value);}} required maxLength={200}/><button type="button" className="gps" onClick={locate} disabled={source==='demo'} aria-label="GPSで現在地を取得" title={source==='demo'?'デモは東京駅固定です':'現在地を取得'}><LocateFixed size={18}/></button></div><small>{source==='demo'?'デモの出発地点は東京駅固定です':locating?'現在地を取得しています…':'GPSが使えなくても手入力できます'}</small></div>
+          <div className="condition"><label><span className="step">02</span>何で行く？</label><div className="transport">{modes.map(m=><button key={m.id} type="button" aria-pressed={mode===m.id} onClick={()=>{reset();setMode(m.id);}}><m.icon size={23}/><span>{m.name}</span></button>)}</div></div>
+          <div className="condition budget-condition"><div className="label-line"><label htmlFor="budget"><span className="step">03</span>どのくらい？</label><div className="metric-switch"><button type="button" aria-pressed={metric==='time'} onClick={()=>{reset();setMetric('time');setBudget('120');}}>時間</button><button type="button" aria-pressed={metric==='distance'} onClick={()=>{reset();setMetric('distance');setBudget('50');}}>距離</button></div></div><div className="budget-line"><input id="budget" type="number" min={metric==='time'?5:1} max={metric==='time'?480:300} step="any" value={budget} onChange={e=>{reset();setBudget(e.target.value);}} required/><span>{metric==='time'?'分':'km'}以内</span></div><small>移動のみ・滞在時間は含みません</small></div>
+          <div className="condition trip-condition"><label><span className="step">04</span>片道？ 往復？</label><div className="trip-switch"><button type="button" aria-pressed={!roundTrip} onClick={()=>{reset();setRoundTrip(false);}}>片道 <ArrowRight size={15}/></button><button type="button" aria-pressed={roundTrip} onClick={()=>{reset();setRoundTrip(true);}}>往復 <RefreshCw size={14}/></button></div><small>{roundTrip?'行き＋帰りの合計で計算':'行きの移動だけで計算'}</small></div>
+        </div><div className="search-bottom"><p><Leaf size={16}/>{source==='demo'?'キーなしで、お出かけ探しを体験できます。':'検索時、出発地点と条件をGoogleに送信します。'}</p><button className="search-button" type="submit">{busy?<><RefreshCw size={19} className="spin"/>探しています…</>:<>どこいく？ <ArrowRight size={19}/></>}</button></div></fieldset></form>
+      </section>
+      <div className="mode-notice"><span className={source==='demo'?'demo-badge':'live-badge'}>{source==='demo'?'DEMO':'LIVE'}</span><span>{source==='demo'?'表示される時間・距離はサンプルです。実際の検索結果ではありません。':'Google Maps Platformによる実際の経路検索です。地域・交通手段によって取得できない場合があります。'}</span>{!liveAvailable&&<span className="setup-note">実APIの設定方法はREADMEへ</span>}</div>
+      {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
+      <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
+        <div className="results-header"><div><div className="eyebrow">YOUR NEXT LITTLE ADVENTURE</div><h2 id="results-heading">{result?'こんな場所は、どう？':'さて、今日はどこへ行こう。'}{result&&<span className="count">{result.destinations.length} SPOTS</span>}</h2></div><div className="result-tools">{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>再抽選</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
+        {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.budget}{result.input.metric==='time'?'分':'km'}以内 <span>·</span>滞在時間を除く</div>}
+        <div className={`results-grid view-${view}`}>
+          <div className="destination-list">
+            {!result?<div className="empty-state"><span className="empty-icon"><Compass size={40}/></span><h3>{busy?'あなたの行き先を探しています':'小さな冒険の、はじまり。'}</h3><p>{busy?'経路をひとつずつ確認しています。':'出発地点と移動の条件を選んで、'}<br/>{busy?'そのままお待ちください。':'「どこいく？」を押してみてください。'}</p>{!busy&&<div className="idea-chips"><span><Waves size={15}/>海風を感じる</span><span><Mountain size={15}/>緑に会いに</span><span><Footprints size={15}/>気ままに歩く</span></div>}</div>:result.destinations.length===0?<div className="empty-state"><Compass size={35}/><h3>条件内の候補が見つかりませんでした</h3><p>時間・距離を広げるか、別の移動手段をお試しください。<br/>未対応の地域・交通手段では結果が出ない場合があります。</p></div>:result.destinations.map((d,i)=><button className={`destination-card ${selectedId===d.id?'selected':''}`} key={d.id} onClick={()=>setSelectedId(d.id)} aria-pressed={selectedId===d.id}><span className={`spot-art art-${i%3}`} aria-hidden="true">{d.category.includes('海')?<Waves size={34}/>:d.category.includes('渓')?<Mountain size={34}/>:<Leaf size={34}/>}<span className="spot-number">{String(i+1).padStart(2,'0')}</span></span><span className="spot-info"><span className="spot-category">{d.category}</span><strong>{d.name}</strong><span className="spot-description">{d.description}</span><span className="spot-stats"><span><Clock3 size={14}/>{minutes(d.seconds)}</span><span><Route size={14}/>{km(d.meters)}</span><span className="trip-tag">{result.input.roundTrip?'往復':'片道'}</span></span></span><span className="selected-indicator">{selectedId===d.id?<Check size={16}/>:<ArrowUpRight size={17}/>}</span></button>)}
+          </div>
+          <div className="map-and-detail"><div className="map-container"><MapView result={result} selected={selected} onSelect={onSelect}/><div className="map-top-label"><MapPin size={13}/>{result?.source==='google'?'Google Maps':'東京周辺 · デモ概念図'}</div></div>
+            {selected&&result?<div className="route-detail"><div className="detail-heading"><div><span className="spot-category">{result.source==='demo'?'サンプルルート':'推奨ルート'}</span><h3>{selected.name}</h3></div><Navigation size={22}/></div><div className="route-stats"><div><Clock3 size={17}/><strong>{minutes(selected.seconds)}</strong><small>{result.input.roundTrip?'往復合計':'片道'}</small></div><div><Route size={17}/><strong>{km(selected.meters)}</strong></div></div>{selected.inbound&&<p className="leg-summary">往路 {minutes(selected.outbound.seconds)} / {km(selected.outbound.meters)} <ArrowRight size={12}/> 復路 {minutes(selected.inbound.seconds)} / {km(selected.inbound.meters)}</p>}<a className="nav-link" href={googleMapsUrl(result.origin,selected.point,result.input.mode)} target="_blank" rel="noopener noreferrer">Google Mapsで往路を開く <ArrowUpRight size={17}/></a><div className="secondary-nav">{selected.inbound&&<a href={googleMapsUrl(selected.point,result.origin,result.input.mode)} target="_blank" rel="noopener noreferrer">Google Mapsで復路 ↗</a>}{result.input.mode==='DRIVE'&&<a href={yahooUrl(selected.point,selected.name)}>Yahoo!カーナビ ↗</a>}</div><p className="nav-note">外部ナビではルート・所要時間が再計算されます。{result.input.mode==='DRIVE'&&'Yahoo!連携はアプリ必須・試験対応で、端末の現在地から出発します。'}</p>{selected.attributions?.map(a=><p key={a.name} className="attribution"><a href={/^https?:/.test(a.uri)?a.uri:undefined} target="_blank" rel="noopener noreferrer">{a.name}</a></p>)}</div>:<div className="map-placeholder-note"><Compass size={18}/><p>気になる場所を選んで、<br/>次のお出かけをイメージしよう。</p><ArrowDown size={19}/></div>}
+          </div>
+        </div>
+        {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}<button className="text-button" onClick={()=>void submit()} disabled={busy}>同じ条件で再検索（実APIでは新たに利用量が発生） <RefreshCw size={13}/></button></div>}
+      </section>
+      <aside className="closing"><span className="closing-icon"><Sparkles size={22}/></span><div><strong>寄り道だって、立派な目的地。</strong><p>予定を決めすぎない一日を、楽しもう。</p></div><span className="closing-line"/><Compass size={40} strokeWidth={1}/></aside>
+    </main><footer><span className="footer-brand">今日どこいく？ <small>ちょっとそこまで、その先へ。</small></span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} 今日どこいく？</span></div></footer>
+  </>;
+}
