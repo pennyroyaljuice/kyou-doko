@@ -1,6 +1,6 @@
 # 一般公開の準備と運用
 
-更新: 2026-11-01。コードは公開準備段階。PUBLIC_SEARCH_ENABLED=falseを維持し、一般アカウントへの実検索開放はまだ行っていません。
+更新: 2026-11-01。Google OAuthを本番公開に変更し、PUBLIC_SEARCH_ENABLED=trueで一般アカウント向けの実検索を開放しました。
 
 ## 実装済み
 
@@ -46,3 +46,8 @@ Googleの現行グローバル公示値: Nearby Search ProとText Search Proは�
 ## 公開先での確認結果
 
 2026-11-01: 管理者実検索1回で残り3→2、共有検索1、写真1、地図1を確認。一般ユーザー開放OFFを維持。Google Auth Platformのアプリ名・ホームページ・privacy/terms URLを保存済み。Google側の公開ステータスはテスト中のまま。Maps JavaScript APIの割当画面ではMap loads per dayが無制限・調整不可と表示されたため、日次ハード上限を設定済みとは扱わない。公開前に地図表示の費用対策（現行キーの制限確認や無料のEmbed方式など）を確定する。
+
+
+## 一般公開の切替結果（2026-11-01）
+
+Google Auth Platformの公開ステータス「本番環境」を画面で確認。アプリのPUBLIC_SEARCH_ENABLED=trueをデプロイ。/loginが200でGoogleログインと1日3回の案内を表示し、匿名検索は401のまま。実Google OAuthでログインし、コールバックからルート画面へ戻ることを管理者アカウントで確認。一般アカウントの権限・3回制限・4回目拒否・管理者画面拒否は署名済みテスト用IDで検証済み。管理者以外の実Googleアカウントを用いた端末確認は利用者に依頼する。地図キーのAPI制限はMaps JavaScript APIのみ、許可リファラーに本番workers.devと旧Sitesドメインを確認。Google側の変更できない日次地図割当はそのままで、キー発行と写真・検索の共有上限を維持。請求ゼロの保証はしない。
