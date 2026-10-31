@@ -11,11 +11,12 @@ const places: (Place & {km:number;minutes:number})[] = [
  {id:'museum',name:'東京国立博物館',category:'博物館',description:'観光・文化施設の操作確認用サンプル。開館日・料金は公式情報をご確認ください。',point:{lat:35.7188,lng:139.7765},km:5,minutes:16}
 ];
 export function demoSearch(input:SearchInput):SearchResult {
+  if (input.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。',422);
   if (typeof input.origin !== 'string' || !['東京駅','東京駅（デモ固定）'].includes(input.origin)) throw new AppError('デモの出発地点は東京駅固定です。任意地点やGPSには実APIモードを選んでください。');
   const tourismIds = ['imperial','museum','disney'];
   const all = places.filter(p=>!input.theme || input.theme === 'all' || (input.theme === 'tourism' ? tourismIds.includes(p.id) : !tourismIds.includes(p.id))).map(p=>{
     const meters = p.km*1000;
-    const seconds = input.mode === 'DRIVE' ? p.minutes*60 : input.mode === 'TRANSIT' ? (p.minutes+12)*60 : meters / (input.mode === 'WALK' ? 4.5 : 16) * 3.6;
+    const seconds = input.mode === 'DRIVE' ? p.minutes*60 : meters / (input.mode === 'WALK' ? 4.5 : 16) * 3.6;
     return totals(p,{meters,seconds},input.roundTrip?{meters:meters*1.03,seconds:seconds*1.08}:undefined);
   });
   return {source:'demo',origin:demoOrigin,originLabel:'東京駅（デモ固定）',input,destinations:rank(all,input),notices:[...(input.mode === 'DRIVE' ? ['デモの時間・距離は固定サンプルです。高速道路設定による経路・到達範囲の変化は通常検索で確認してください。'] : []),'すべて操作確認用のデモ数値です。実際の経路検索・時刻・距離ではありません。']};

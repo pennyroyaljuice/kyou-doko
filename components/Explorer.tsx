@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useState } from 'react';
-import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, TrainFront, Waves, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Waves, X } from 'lucide-react';
 import type { Mode, Point, SearchInput, SearchResult } from '@/lib/domain';
 import { themeLabels, type DestinationTheme } from '@/lib/themes';
 import { googleMapsUrl, yahooUrl } from '@/lib/navigation';
 import MapView from './MapView';
 import DestinationCard from './DestinationCard';
 import { getCurrentLocation } from '@/lib/location';
-const modes = [{id:'DRIVE',name:'車',icon:Car},{id:'TRANSIT',name:'電車',icon:TrainFront},{id:'BICYCLE',name:'自転車',icon:Bike},{id:'WALK',name:'徒歩',icon:Footprints}] as const;
+const modes = [{id:'DRIVE',name:'車',icon:Car},{id:'BICYCLE',name:'自転車',icon:Bike},{id:'WALK',name:'徒歩',icon:Footprints}] as const;
 const minutes=(s:number)=>`${Math.ceil(s/60)}分`;
 const km=(m:number)=>`${(m/1000).toFixed(1)} km`;
 export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:{liveAvailable:boolean;mapsApiKey:string;liveAccess:boolean;signedIn:boolean}) {

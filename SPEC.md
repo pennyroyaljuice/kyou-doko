@@ -3,7 +3,7 @@
 ## 検索
 
 1. 起点は任意の駅名・住所・緯度経度またはGPS。GPS拒否時は手入力を維持。
-2. 車 DRIVE、電車 TRANSIT（鉄道優先）、自転車 BICYCLE、徒歩 WALK。
+2. 車 DRIVE、自転車 BICYCLE、徒歩 WALK。電車検索は提供しない。
 3. 時間5〜480分、距離1〜300kmを上限として指定。片道/往復を選ぶ。
 4. Places Nearby Searchで観光・公園・自然系を最大8件取得。時間からの速度仮定は探索半径のみに使用し、表示時間には使用しない。
 5. 各候補のRoutes Compute Routes結果で判定。往復は復路を別に取得。公共交通の復路は往路到着直後の出発としてリクエスト。
@@ -42,3 +42,10 @@ Google Maps URLは片道ごとに起点・目的地・交通手段を渡す。�
 自然には山頂・海岸・渓谷周辺の公園・展望地点等を含みます。Googleの分類は重複するため厳密な排他的分類ではありません。峠専用の検索タイプはなく、峠や走行する山道の網羅検索は未対応。将来は独自スポットデータや周遊経路で拡張します。デモの分類・数値は固定サンプルです。
 
 公式分類: https://developers.google.com/maps/documentation/places/web-service/place-types
+
+
+## 電車検索の提供停止（2026-11-01）
+
+Googleの公式FAQではRoutes APIの公共交通対応から日本の事業者が除外されています。Google Maps製品の対応とAPIの対応は異なります。追加API・契約を増やさない方針により、電車を通常・デモ両方の選択肢から除外。古いTRANSIT入力は422で明示的に拒否し、出発地解決・Places候補探索・Routes呼出しより前に停止します。内部のMode型と外部ナビURLの変換は将来のプロバイダー追加用に保持します。
+
+根拠: https://developers.google.com/maps/faq#transit_directions_countries

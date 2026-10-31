@@ -29,3 +29,10 @@ PlacesはNearby Search 1件、手入力の起点はText Search最大1件、経�
 自然には山頂・海岸・渓谷周辺の公園・展望地点等を含みます。Googleの分類は重複するため厳密な排他的分類ではありません。峠専用の検索タイプはなく、峠や走行する山道の網羅検索は未対応。将来は独自スポットデータや周遊経路で拡張します。デモの分類・数値は固定サンプルです。
 
 公式分類: https://developers.google.com/maps/documentation/places/web-service/place-types
+
+
+## 電車検索の提供停止（2026-11-01）
+
+Googleの公式FAQではRoutes APIの公共交通対応から日本の事業者が除外されています。Google Maps製品の対応とAPIの対応は異なります。追加API・契約を増やさない方針により、電車を通常・デモ両方の選択肢から除外。古いTRANSIT入力は422で明示的に拒否し、出発地解決・Places候補探索・Routes呼出しより前に停止します。内部のMode型と外部ナビURLの変換は将来のプロバイダー追加用に保持します。
+
+根拠: https://developers.google.com/maps/faq#transit_directions_countries

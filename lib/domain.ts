@@ -16,6 +16,7 @@ export function parseInput(v: unknown): SearchInput {
   if (!v || typeof v !== 'object') throw new AppError('検索条件を確認してください。');
   const x = v as SearchInput;
   if (!['demo','google'].includes(x.source) || !['DRIVE','TRANSIT','BICYCLE','WALK'].includes(x.mode) || !['time','distance'].includes(x.metric) || typeof x.roundTrip !== 'boolean') throw new AppError('検索条件が正しくありません。');
+  if (x.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
   if (!(typeof x.origin === 'string' ? x.origin.trim().length > 0 && x.origin.length <= 200 : isPoint(x.origin))) throw new AppError('出発地点を入力してください（200文字以内）。');
   const min = x.metric === 'time' ? 5 : 1, max = x.metric === 'time' ? 480 : 300;
   if (typeof x.budget !== 'number' || !Number.isFinite(x.budget) || x.budget < min || x.budget > max) throw new AppError(`上限は${min}〜${max}${x.metric === 'time' ? '分' : 'km'}で指定してください。`);

@@ -1,0 +1,10 @@
+import {afterEach,it,expect,vi} from 'vitest';
+import {parseInput,type SearchInput} from '../lib/domain';
+import {search} from '../lib/search';
+import {GoogleProvider} from '../lib/google';
+import {demoSearch} from '../lib/demo';
+const input:SearchInput={source:'google',origin:'東京駅',mode:'TRANSIT',metric:'time',budget:120,roundTrip:true};
+afterEach(()=>vi.unstubAllGlobals());
+it('通常・デモとも古い電車入力を明示的に拒否する',()=>{for(const source of ['demo','google'] as const)expect(()=>parseInput({...input,source})).toThrow('電車検索');expect(()=>demoSearch({...input,source:'demo'})).toThrow('電車検索');});
+it('出発地解決・候補探索・経路検索を呼ぶ前に止める',async()=>{const resolve=vi.fn(),nearby=vi.fn(),route=vi.fn();await expect(search(input,{resolve,nearby,route})).rejects.toThrow('対象外');expect(resolve).not.toHaveBeenCalled();expect(nearby).not.toHaveBeenCalled();expect(route).not.toHaveBeenCalled();});
+it('プロバイダーを直接呼んでも外部通信しない',async()=>{const fetch=vi.fn();vi.stubGlobal('fetch',fetch);await expect(new GoogleProvider('test').route({lat:35,lng:139},{lat:36,lng:140},'TRANSIT',new Date())).rejects.toThrow('対象外');expect(fetch).not.toHaveBeenCalled();});

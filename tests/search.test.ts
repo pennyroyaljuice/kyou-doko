@@ -25,8 +25,8 @@ describe('実APIオーケストレーション',()=>{
   const origin={lat:35.68,lng:139.76};
   const route=vi.fn().mockResolvedValueOnce({seconds:1200,meters:9000}).mockResolvedValueOnce({seconds:1500,meters:11000});
   const provider:DiscoveryProvider={resolve:vi.fn().mockResolvedValue({point:origin,label:'出発'}),nearby:vi.fn().mockResolvedValue([place]),route};
-  const result=await search({...input,mode:'TRANSIT'},provider);
-  expect(route.mock.calls[1].slice(0,3)).toEqual([place.point,origin,'TRANSIT']);
+  const result=await search({...input,mode:'WALK'},provider);
+  expect(route.mock.calls[1].slice(0,3)).toEqual([place.point,origin,'WALK']);
   expect(route.mock.calls[1][3].getTime()-route.mock.calls[0][3].getTime()).toBe(1200000);
   expect(result.destinations[0].seconds).toBe(2700);
  });

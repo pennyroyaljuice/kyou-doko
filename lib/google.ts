@@ -41,11 +41,12 @@ export class GoogleProvider implements DiscoveryProvider {
     return ticket?{ticket,authors:(first.authorAttributions??[]).map(a=>({name:a.displayName,uri:a.uri}))}:undefined;
   }
   async route(origin: Point, destination: Point, mode: Mode, departure: Date, options?: { avoidHighways?: boolean }): Promise<Leg|null> {
+    if (mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
     const waypoint = (p:Point)=>({location:{latLng:{latitude:p.lat,longitude:p.lng}}});
     const data = await this.request<{routes?:{duration:string;distanceMeters:number;polyline?:{encodedPolyline:string}}[]}>('https://routes.googleapis.com/directions/v2:computeRoutes',{
       origin:waypoint(origin),destination:waypoint(destination),travelMode:mode,languageCode:'ja',units:'METRIC',computeAlternativeRoutes:false,
       ...(mode === 'DRIVE' ? {routingPreference:'TRAFFIC_UNAWARE',routeModifiers:{avoidHighways:options?.avoidHighways === true}} : {}),
-      ...(mode === 'TRANSIT' ? {departureTime:departure.toISOString(),transitPreferences:{allowedTravelModes:['TRAIN','SUBWAY','LIGHT_RAIL','RAIL']}} : {})
+
     },'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline');
     const route = data.routes?.[0];
     if (!route) return null;

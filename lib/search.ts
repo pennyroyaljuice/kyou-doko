@@ -1,6 +1,7 @@
-import { distance, radius, rank, totals, type SearchInput, type SearchResult, type Destination } from './domain';
+import { AppError, distance, radius, rank, totals, type SearchInput, type SearchResult, type Destination } from './domain';
 import type { DiscoveryProvider } from './providers';
 export async function search(input:SearchInput, provider:DiscoveryProvider):Promise<SearchResult> {
+  if (input.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
   const origin = await provider.resolve(input.origin);
   const places = await provider.nearby(origin.point,radius(input),input.theme);
   let unavailable = 0;
@@ -22,6 +23,5 @@ export async function search(input:SearchInput, provider:DiscoveryProvider):Prom
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
-  if (input.mode === 'TRANSIT') notices.push('鉄道を優先する公共交通です。徒歩や他の交通機関を含む場合があります。復路は到着直後（滞在ゼロ）の出発で計算します。');
   return {source:'google',origin:origin.point,originLabel:origin.label,input,destinations:rank(items,input),notices};
 }
