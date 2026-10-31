@@ -2,7 +2,7 @@
 
 「目的地は決まっていない。でも、どこかへ行きたい。」時間・距離の上限から外出先を提案する、ローカル向けNext.js MVPです。
 
-公開Web版：[今日どこいく？](https://kyou-doko.pennyroyal-juice.workers.dev/)（一般公開はデモ、管理者パスワードでログインすると実検索）。[公開状況](docs/PUBLISHING.md)を参照。
+公開Web版：[今日どこいく？](https://kyou-doko.pennyroyal-juice.workers.dev/)（一般公開はデモ、本人のGoogleアカウントでログインすると実検索）。[公開状況](docs/PUBLISHING.md)を参照。
 
 GitHub：[pennyroyaljuice/kyou-doko](https://github.com/pennyroyaljuice/kyou-doko)（公開）。`main`はNext.js版、[`cloudflare`](https://github.com/pennyroyaljuice/kyou-doko/tree/cloudflare)は現在のCloudflare公開元、`sites`は旧Sites版です。GitHubへのpushによる自動デプロイは未設定です。
 
