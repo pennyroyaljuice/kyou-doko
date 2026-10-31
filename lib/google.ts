@@ -1,6 +1,7 @@
+import { explorationAreas, explorationCandidates } from './exploration';
 import { themeFilter, matchesTheme, type DestinationTheme } from './themes';
 import { photoTicket } from './photos';
-import { AppError, isPoint, type Point, type Place, type Leg, type Mode } from './domain';
+import { AppError, isPoint, type Point, type Place, type Leg, type Mode, type SearchInput } from './domain';
 import type { DiscoveryProvider } from './providers';
 type GooglePlace = { types?: string[]; primaryType?: string; photos?: {name:string;authorAttributions?:{displayName:string;uri?:string}[]}[]; id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
 const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.types,places.primaryType,places.attributions,places.photos';
@@ -28,11 +29,18 @@ export class GoogleProvider implements DiscoveryProvider {
     if (!p?.location) throw new AppError('出発地点が見つかりませんでした。駅名・住所・緯度,経度で指定してください。',422);
     return {point:{lat:p.location.latitude,lng:p.location.longitude},label:p.displayName?.text ?? origin};
   }
-  async nearby(origin: Point, radius: number, theme: DestinationTheme = 'all'): Promise<Place[]> {
+  async nearby(origin: Point, radius: number, theme: DestinationTheme = 'all', rankPreference: 'POPULARITY'|'DISTANCE' = 'POPULARITY'): Promise<Place[]> {
     const data = await this.request<{places?:GooglePlace[]}>('https://places.googleapis.com/v1/places:searchNearby',{
-      ...themeFilter(theme),maxResultCount:8,languageCode:'ja',rankPreference:'POPULARITY',locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
+      ...themeFilter(theme),maxResultCount:8,languageCode:'ja',rankPreference,locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
     },fields);
     return Promise.all((data.places??[]).filter(p=>p.location && matchesTheme(p.types,theme,p.primaryType)).map(async p=>({id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri})),photo:await this.photo(p)})));
+  }
+  async discover(origin:Point,input:SearchInput):Promise<Place[]> {
+    const groups:Place[][]=[];
+    const areas=explorationAreas(origin,input);
+    // Two concurrent requests; four total, without unbounded expansion or retries.
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE'))));
+    return explorationCandidates(groups,origin,input);
   }
   private async photo(place:GooglePlace) {
     const first=place.photos?.[0],secret=this.key;

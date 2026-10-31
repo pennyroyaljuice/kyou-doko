@@ -1,0 +1,13 @@
+import {it,expect,vi,afterEach} from 'vitest';
+import {explorationAreas,explorationCandidates} from '../lib/exploration';
+import {distance,type SearchInput,type Place} from '../lib/domain';
+import {GoogleProvider} from '../lib/google';
+import {search} from '../lib/search';
+const origin={lat:35.6812,lng:139.7671};
+const input:SearchInput={source:'google',origin,mode:'DRIVE',metric:'time',budget:120,roundTrip:true};
+const make=(id:string,point=origin):Place=>({id,point,name:id,category:'公園',description:''});
+afterEach(()=>vi.unstubAllGlobals());
+it('120分往復は都心ではなく約39km離れた四方向を探す',()=>{const areas=explorationAreas(origin,input);expect(areas).toHaveLength(4);for(const area of areas){expect(distance(origin,area.center)).toBeCloseTo(39000,3);expect(area.radius).toBe(15000);}expect(areas[0].center.lat).toBeGreaterThan(origin.lat);expect(areas[2].center.lat).toBeLessThan(origin.lat);expect(areas[1].center.lng).toBeGreaterThan(origin.lng);expect(areas[3].center.lng).toBeLessThan(origin.lng);});
+it('重複と範囲外を除外して四方向から8件を選ぶ',()=>{const areas=explorationAreas(origin,input),groups=areas.map((a,i)=>[make('duplicate',a.center),...Array.from({length:5},(_,j)=>make(i+'-'+j,a.center)),make('outside',{lat:40,lng:140})]);const selected=explorationCandidates(groups,origin,input);expect(selected).toHaveLength(8);expect(new Set(selected.map(p=>p.id)).size).toBe(8);expect(selected.some(p=>p.id==='outside')).toBe(false);for(let i=0;i<4;i++)expect(selected.some(p=>p.id.startsWith(i+'-'))).toBe(true);});
+it('Google候補検索を最大4回・経路対象を最大8件に制限する',async()=>{const f=vi.fn().mockImplementation(async(_url,options)=>{const b=JSON.parse(options.body),center=b.locationRestriction.circle.center;return new Response(JSON.stringify({places:Array.from({length:8},(_,i)=>({id:center.latitude+':'+center.longitude+':'+i,location:center,displayName:{text:'公園'}}))}));});vi.stubGlobal('fetch',f);expect(await new GoogleProvider('test').discover(origin,input)).toHaveLength(8);expect(f).toHaveBeenCalledTimes(4);for(const call of f.mock.calls)expect(JSON.parse(call[1].body).rankPreference).toBe('DISTANCE');});
+it('遠方候補の実経路で120分以内を判定し降順表示、往復16回を超えない',async()=>{const discover=vi.fn().mockResolvedValue(Array.from({length:12},(_,i)=>make(String(i))));const nearby=vi.fn(),route=vi.fn(async(_from,_to)=>({seconds:3300,meters:40000}));const r=await search(input,{resolve:async()=>({point:origin,label:'東京駅'}),discover,nearby,route});expect(nearby).not.toHaveBeenCalled();expect(route).toHaveBeenCalledTimes(16);expect(r.destinations).toHaveLength(8);expect(r.destinations[0].seconds/60).toBe(110);});
