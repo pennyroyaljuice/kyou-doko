@@ -1,68 +1,48 @@
-# 今日どこいく？ — Cloudflare単独公開版
+# 今日どこいく？ — Cloudflare公開版
 
-このブランチはご自身のCloudflareアカウントへ配置するための版です。ChatGPT Sitesへの依存を外しています。既存Sites版は別ブランチsitesで維持します。
+公開URL: https://kyou-doko.pennyroyal-juice.workers.dev/
 
-## 構成
+## 利用範囲
 
-- `/`：一般公開デモ。Googleの有料APIを呼ばず、地図用キーも送信しません。
-- `/admin/`：本人用。Cloudflare Accessの署名済みJWTを検証し、本人のみ実検索を許可。
-- `/admin/api/search`：本人用の実検索。一般向け`/api/search`から実検索することはできません。
-- 認証・Googleキー・有効化設定が揃うまで実検索は停止。新規公開時はデモだけで動作します。
+- `/`: 匿名の公開デモ。Google APIの検索・地図を呼びません。
+- `/admin/`: 管理者パスワードで本人のみ実検索。Zero Trust契約不要。
+- 管理者ログインの有効期限は8時間。HttpOnly/Secure/SameSite=Strict Cookieを使用。
+- POSTは同一Originのみ。外部からの本人ヘッダーは削除します。
+- ログインはIPごと5回/60秒（Cloudflare拠点ごとの近似制限。世界共通の厳密な上限ではありません）。
+- ログアウトはCookieを削除します。盗難済みトークンは期限まで有効なので、漏洩時はセッション秘密鍵を変更します。
 
-## ローカル確認
+## 開発と公開
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm test
 pnpm typecheck
 pnpm build
-pnpm start
-```
-
-39件のテストに、偽造JWT・有効期限・発行元・対象アプリ・本人以外・偽の認証ヘッダーの拒否を含みます。ローカルの管理画面は実Access認証がないので403です。
-
-## 自分のCloudflareへ公開
-
-```sh
-pnpm exec wrangler login
-pnpm exec wrangler whoami
-pnpm build
 pnpm deploy
 ```
 
-初回にアカウント選択が必要な場合は自分のアカウントを指定します。既存のkyou-doko Workerがある場合は上書きせず名前を変更してください。URLはデプロイ成功時に表示される `https://kyou-doko.<自分のサブドメイン>.workers.dev` です。まだデプロイしていない段階でURLを推測して公開済みと扱わないでください。
+43件のテストで期限切れ・偽造・別Origin・パスワード変更・未設定拒否等を確認します。
+秘密値はCloudflare Secretsに標準入力で登録します。Git、チャット、引数にキーやパスワードを載せないでください。
 
-有料プランへの変更は自動で行いません。現在の設定は実検索停止・プレビューURL無効です。Googleキーもデプロイ内容に含めません。
-
-## 本人限定の実検索を有効にする
-
-1. Cloudflare Zero Trustを開き、AccessにSelf-hostedアプリケーションを作成します。対象は新しいホスト名の `/admin/*`。一般デモのルート `/` 全体は保護しません。
-2. Allowポリシーで自分のメールアドレスだけを許可します。Everyoneは選ばないでください。ログイン方法はメールのワンタイムPIN等を設定できます。プラン・利用規約・請求条件は画面で確認し、不要な有料契約はしないでください。
-3. Accessのチームドメイン（`https://<team>.cloudflareaccess.com`）とアプリケーションAUDタグを確認します。
-4. Workerの環境変数・Secretsへ以下を設定します。
-
-| 名前 | 内容 |
+| Secret | 用途 |
 |---|---|
-| CF_ACCESS_TEAM_DOMAIN | Accessのチームドメイン |
-| CF_ACCESS_AUD | AccessアプリのAUD |
-| LIVE_SEARCH_OWNER_EMAIL | 本人のメールアドレス |
-| LIVE_SEARCH_OWNER_USER_ID | 任意：Accessのsub。SitesのIDとは異なるのでコピーしない |
-| GOOGLE_MAPS_API_KEY | Places/Routes用の秘密キー |
-| NEXT_PUBLIC_GOOGLE_MAPS_API_KEY | 制限済み地図表示キー |
+| ADMIN_PASSWORD_HASH | ランダム24バイト以上の専用パスワードのSHA-256（16進数）。人が考えた短いパスワードは使用不可 |
+| ADMIN_SESSION_SECRET | ランダム48バイトのセッション署名鍵 |
+| LIVE_SEARCH_OWNER_USER_ID | password-owner |
+| LIVE_SEARCH_OWNER_EMAIL | 本人のメール |
+| GOOGLE_MAPS_API_KEY | サーバーのPlaces/Routes用キー |
+| NEXT_PUBLIC_GOOGLE_MAPS_API_KEY | リファラー・API制限済みの地図表示キー |
 
-キーはチャット・GitHubに貼らずSecretsへ登録します。Codexによる登録時は標準入力だけで渡し、キーの値をログや引数へ出しません。
+パスワードはランダム生成した高エントロピー値のみを使う設計のためSHA-256照合を採用。一般利用者が選ぶパスワードには適用しません。パスワードハッシュ変更で既存セッションも失効します。`ADMIN_SESSION_SECRET`変更でも全端末を失効できます。
 
-5. Google Cloudの地図表示キーのウェブサイト制限に、新URLの `https://kyou-doko.<自分のサブドメイン>.workers.dev/*` を追加します。旧URLを使う間は旧リファラーも残します。
-6. 認証・キー設定の確認後だけ `wrangler.jsonc` のLIVE_SEARCH_ENABLEDをtrueへ変えて再ビルド・再デプロイ。ダッシュボードだけで値を変えると次のWranglerデプロイでfalseへ戻るため、意図して設定を同期してください。
+`wrangler.jsonc`のLIVE_SEARCH_ENABLEDがtrueで、本人認証とGoogle設定が揃った場合に実検索が有効になります。falseで停止できます。Googleキーは移行済みですが、地図表示キーのリファラーに `https://kyou-doko.pennyroyal-juice.workers.dev/*` の許可が必要です。旧URLを使う間は旧リファラーも残してください。
 
-Cloudflare Accessのゲートを通らず管理エンドポイントへ直接到達しても、Worker自身がJWTの署名・発行元・対象アプリ・期限・本人を検証して拒否します。外部からの認証ヘッダーは毎回削除し、検証後にだけ内部用の本人情報を設定します。
+検索APIには従来の同時実行・10秒間隔・1時間30回の制限がありますが、Workerインスタンス単位なので厳密な全体課金上限ではありません。一般利用者への実検索開放前に共有ストレージによる予算管理が必要です。
 
-## 移行状況
+## 運用状況
 
-ご自身のCloudflareアカウントへデモ版を配置済みです。
+本人ログイン・実Google検索8件・未認証401・偽ヘッダー拒否・別Origin403・ログアウトを公開先で検証しました。一般公開はデモのままです。旧Sites版はsitesブランチで維持しています。
 
-URL：https://kyou-doko.pennyroyal-juice.workers.dev/
+将来の課金会員はGoogle等のアカウント認証と会員・契約管理へ拡張します。現在の単一管理者パスワードを会員全員で共有する設計にはしません。
 
-デモ検索8件、ホーム・CSSの200応答、未認証管理画面の403を確認。39件のテスト・型チェック・ビルド・アップロード検証成功。本人用実検索はCloudflare AccessとGoogleの新URL制限の設定待ちで、Googleキーは移行先へ登録していません。旧Sites公開URLと本人用実検索は継続稼働しています。
-
-公式資料：[Workers URL](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)、[Access設定](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)、[JWTの検証](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)。
+公式資料: [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)、[Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)。
