@@ -1,25 +1,20 @@
 # 公開状況
 
-2026-10-31：Web版のデプロイ完了。
+2026-10-31：自身のCloudflareアカウントへの移行と動作確認を完了。
 
-- URL：https://kyou-doko-outing.radical-steamer.chatgpt.site
-- 閲覧範囲：所有者本人のみ。同じChatGPTアカウントでログインして利用。
-- Googleキー未設定のためデモモードのみ。
-- 未ログインのブラウザーではサインイン要求が表示されることを確認。
-- 公開前のWorkerでホーム、規約、プライバシー、デモ検索が200。テスト16件・型チェック・公開ビルド成功。
+- 公開URL：https://kyou-doko.pennyroyal-juice.workers.dev/
+- 一般公開：デモ検索のみ。Googleの検索・地図APIを呼びません。
+- 管理者：https://kyou-doko.pennyroyal-juice.workers.dev/admin/login
+- 専用パスワードで本人のみ実検索。ログイン期限8時間。Zero Trust契約は不要です。
+- 本人ログイン、実検索8件、Google地図・推奨ルート、匿名拒否、偽ヘッダー拒否、連続ログイン制限を確認済み。43件のテスト、型チェック、ビルド成功。
+- Google API利用分は本人の実検索・地図利用時に発生します。検索制限は厳密な全体課金上限ではありません。
 
-## ソース
+## ソースと更新
 
-GitHubリポジトリ： https://github.com/pennyroyaljuice/kyou-doko （公開）。Next.js版は`main`ブランチ、Sites公開版は`sites`ブランチで管理します。2026-10-31にユーザー指定でリポジトリを公開へ変更。Webアプリの閲覧範囲は所有者限定を維持しています。
+GitHub：https://github.com/pennyroyaljuice/kyou-doko （公開）。
 
-Sites公開版のローカルコードは隣の`kyou-doko-site`。Sites管理のGitソースとGitHubの`sites`ブランチの両方へ同期します。GitHubへのpushだけでWebアプリが自動更新される設定にはしていません。Web更新はSitesのビルド・保存・デプロイ手順で行います。
+- main：ローカル向けNext.js MVP
+- cloudflare：現在の公開元。構成・秘密設定・運用方法は同ブランチのREADMEを参照。
+- sites：旧ChatGPT Sites版（旧URLは移行期間中のため維持）
 
-- Site ID：`appgprj_6ae5b65bb77c81918af7418dad6366f2`
-- 公開元コミット：`a3469f9454a53b0f5f09af457fd8664175c6beb2`
-- デプロイID：`appgdep_6ae5b76f52a88191ad58e5baf5d652fb`
-
-APIキー、node_modules、ビルド生成物はGitに含めていません。
-
-## 公開デモへの変更
-
-一般閲覧はデモのみ。本人はChatGPTログイン後に実検索可能です。Google API課金の対象は本人の実検索・実地図利用です。詳細は[PUBLIC_DEMO.md](PUBLIC_DEMO.md)を参照してください。
+Cloudflare版はpnpm buildとpnpm deployで公開します。GitHub pushのみの自動更新は未設定です。APIキー・パスワード・秘密鍵・生成物はGitに含めません。

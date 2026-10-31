@@ -2,9 +2,9 @@
 
 「目的地は決まっていない。でも、どこかへ行きたい。」時間・距離の上限から外出先を提案する、ローカル向けNext.js MVPです。
 
-スマートフォン用Web版：[今日どこいく？](https://kyou-doko-outing.radical-steamer.chatgpt.site)（所有者限定・同じChatGPTアカウントでログイン・現在はデモのみ）。[公開状況](docs/PUBLISHING.md)を参照。
+公開Web版：[今日どこいく？](https://kyou-doko.pennyroyal-juice.workers.dev/)（一般公開はデモ、管理者パスワードでログインすると実検索）。[公開状況](docs/PUBLISHING.md)を参照。
 
-GitHub：[pennyroyaljuice/kyou-doko](https://github.com/pennyroyaljuice/kyou-doko)（公開）。`main`はNext.js版、`sites`は現在のWeb公開元です。Webアプリの閲覧は引き続き所有者限定です。GitHubへのpushによる自動デプロイは未設定です。
+GitHub：[pennyroyaljuice/kyou-doko](https://github.com/pennyroyaljuice/kyou-doko)（公開）。`main`はNext.js版、[`cloudflare`](https://github.com/pennyroyaljuice/kyou-doko/tree/cloudflare)は現在のCloudflare公開元、`sites`は旧Sites版です。GitHubへのpushによる自動デプロイは未設定です。
 
 ## 起動
 
@@ -40,7 +40,7 @@ GPS（localhostまたはHTTPS）・住所/駅名/緯度経度、4移動手段、
 
 候補探索は半径最大50km・最大8候補に限定。網羅的な到達圏検索ではありません。峠などPlacesに登録されていないスポットも見つかりません。渋滞・料金・営業時間は保証しません。周遊自動生成、復路の好み指定は将来機能です。
 
-本番公開前には運営者情報と問い合わせ先の追加、規約・プライバシー文面の確認、認証・永続的レート制限・監視が必要です。プロセス内の制限はローカル開発用で、本番の課金防御には不十分です。APIキーのある状態での課金を伴う疎通試験は未実施です。
+本番公開前には運営者情報と問い合わせ先の追加、規約・プライバシー文面の確認、認証・永続的レート制限・監視が必要です。プロセス内の制限はローカル開発用で、本番の課金防御には不十分です。Cloudflare公開版では本人ログイン・実検索8件・地図と推奨ルート表示を確認済みです。
 
 詳細は[SPEC.md](SPEC.md)、[ARCHITECTURE.md](ARCHITECTURE.md)、[API調査](docs/API_RESEARCH.md)、[確認結果](docs/VALIDATION.md)を参照。
 
