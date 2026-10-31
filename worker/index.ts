@@ -27,7 +27,7 @@ export default {
    if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
    if(path.startsWith('/admin/')&&!identity!.isOwner)return new Response(null,{status:403});
    if(request.method!=='GET')return new Response(null,{status:405});
-   try{const usage=await checkUsage(env,identity!.sub,'search',false);return Response.json(identity!.isOwner?usage:{remaining:usage.remaining,resetAt:usage.resetAt,limits:{userDaily:usage.limits.userDaily},allowed:usage.allowed,reason:usage.reason},{headers:{'Cache-Control':'no-store'}});}catch{return usageError();}
+   try{const usage=await checkUsage(env,identity!.sub,'search',false,identity!.isOwner);return Response.json(identity!.isOwner?usage:{remaining:usage.remaining,resetAt:usage.resetAt,limits:{userDaily:usage.limits.userDaily},allowed:usage.allowed,reason:usage.reason},{headers:{'Cache-Control':'no-store'}});}catch{return usageError();}
   }
   if(path==='/api/maps-key')return Response.json({error:'地図はEmbed版に移行しました。画面を再読み込みしてください。'},{status:410,headers:{'Cache-Control':'no-store'}});
   if(path==='/api/embed-key'){
@@ -55,7 +55,7 @@ export default {
      if(env.LIVE_SEARCH_ENABLED!=='true')return Response.json({error:'検索は現在停止中です。'},{status:503});
      const store=await preferenceStore(env,identity!.sub);const prefsResponse=await store.fetch('https://usage.internal/preferences');if(!prefsResponse.ok)throw Error('Preferences unavailable');
      headers.set('x-kyou-excluded-places',JSON.stringify(excludedIds(await prefsResponse.json() as Preferences)));
-     const usage=await checkUsage(env,identity!.sub,'search',true);
+     const usage=await checkUsage(env,identity!.sub,'search',true,identity!.isOwner);
      if(!usage.allowed)return Response.json({error:usage.reason,remaining:usage.remaining,resetAt:usage.resetAt},{status:429,headers:{'Cache-Control':'no-store'}});
      headers.set('x-kyou-budget-approved','true');
     }
