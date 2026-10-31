@@ -5,7 +5,7 @@ export function explorationAreas(origin:Point,input:SearchInput) {
  return [0,Math.PI/2,Math.PI,Math.PI*1.5].map(bearing=>{
  const phi=Math.asin(Math.sin(lat)*Math.cos(angular)+Math.cos(lat)*Math.sin(angular)*Math.cos(bearing));
  const lambda=lng+Math.atan2(Math.sin(bearing)*Math.sin(angular)*Math.cos(lat),Math.cos(angular)-Math.sin(lat)*Math.sin(phi));
- return {center:{lat:phi*180/Math.PI,lng:((lambda*180/Math.PI+540)%360)-180},radius:Math.max(100,reach*0.3)};
+ return {center:{lat:phi*180/Math.PI,lng:((lambda*180/Math.PI+540)%360)-180},radius:Math.max(100,Math.min(50000,reach*0.3))};
  });
 }
 export function explorationCandidates(groups:Place[][],origin:Point,input:SearchInput):Place[] {

@@ -35,7 +35,7 @@ export function rank(items: Destination[], input: SearchInput) {
 export function radius(input: SearchInput) {
   const speed = {DRIVE:50,TRANSIT:60,BICYCLE:18,WALK:5}[input.mode];
   const km = input.metric === 'distance' ? input.budget : input.budget / 60 * speed;
-  return Math.max(100, Math.min(50000, km * 1000 / (input.roundTrip ? 2 : 1)));
+  return Math.max(100, Math.min(300000, km * 1000 / (input.roundTrip ? 2 : 1)));
 }
 export function totals(place: Place, outbound: Leg, inbound?: Leg): Destination {
   return {...place, outbound, inbound, seconds:outbound.seconds+(inbound?.seconds??0), meters:outbound.meters+(inbound?.meters??0)};

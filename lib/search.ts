@@ -19,7 +19,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider):Prom
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));
   }
-  const notices = ['最大50km圏内の4方向で候補を探索し、最大8スポットの経路を確認します。探索位置は目安で、実際の経路時間・距離が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。'];
+  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の4方向で候補を探索し、最大8スポットの経路を確認します。探索位置は目安で、実際の経路時間・距離が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
