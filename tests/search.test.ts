@@ -20,6 +20,12 @@ describe('入力と上限判定',()=>{
   expect(rank(items,input).map(x=>x.seconds/60)).toEqual([60,45,20]);
  });
 });
+describe('120の上限に近い表示順',()=>{
+ it.each(['time','distance'] as const)('%sで上限超過を除き100→70→30の順にする',metric=>{
+ const items=[30,130,70,100].map((value,i)=>totals({...place,id:String(i)},{seconds:(metric==='time'?value:150-value)*60,meters:(metric==='distance'?value:150-value)*1000}));
+ const ranked=rank(items,{...input,metric,budget:120});expect(ranked.map(d=>metric==='time'?d.seconds/60:d.meters/1000)).toEqual([100,70,30]);expect(items.map(d=>d.id)).toEqual(['0','1','2','3']);
+ });
+});
 describe('実APIオーケストレーション',()=>{
  it('復路の起点終点を反転し、往路到着後の時刻を渡す',async()=>{
   const origin={lat:35.68,lng:139.76};

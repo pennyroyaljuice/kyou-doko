@@ -47,8 +47,8 @@ export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:
   }
   function shuffle() {
     if(!result||result.destinations.length<2)return;
-    const destinations=[...result.destinations.slice(1),result.destinations[0]];
-    setResult({...result,destinations});setSelectedId(destinations[0].id);
+    const current=result.destinations.findIndex(d=>d.id===selectedId);
+    setSelectedId(result.destinations[(current+1)%result.destinations.length].id);
   }
   const changeSource=(s:'demo'|'google')=>{if(s==='google'&&!liveAccess)return;reset();setSource(s);setGps(null);setGpsAccuracy(null);setOrigin(s==='demo'?'東京駅':'');};
   return <>
@@ -67,8 +67,8 @@ export default function Explorer({liveAvailable,mapsApiKey,liveAccess,signedIn}:
       <div className="mode-notice"><span className={source==='demo'?'demo-badge':'live-badge'}>{source==='demo'?'DEMO':liveAvailable?'LIVE':'準備中'}</span><span>{source==='demo'?'表示される時間・距離はサンプルです。実際の検索結果ではありません。':liveAvailable?'現在地は検索ボタンを押したときにGoogleへ送信します。':'位置情報はブラウザー内だけで保持し、現在は検索サービスへ送信しません。'}</span></div>
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
-        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>再抽選</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
-        {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name}{result.input.mode==='DRIVE'&&<> / {result.input.avoidHighways?'高速回避':'高速利用可'}</>} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.budget}{result.input.metric==='time'?'分':'km'}以内 <span>·</span>{themeLabels[result.input.theme??'all']} <span>·</span>滞在時間を除く</div>}
+        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
+        {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name}{result.input.mode==='DRIVE'&&<> / {result.input.avoidHighways?'高速回避':'高速利用可'}</>} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.budget}{result.input.metric==='time'?'分':'km'}以内 <span>·</span>{themeLabels[result.input.theme??'all']} <span>·</span>滞在時間を除く <span>·</span>{result.input.metric==='time'?'時間':'距離'}の上限に近い順</div>}
         <div className={`results-grid view-${view}`}>
           <div className="destination-list">
             {!result?<div className="empty-state"><h3>{busy?'検索中…':'検索結果はここに表示されます'}</h3><p>{busy?'経路と移動時間を確認しています。':'条件を指定して「どこいく？」を押してください。'}</p></div>:result.destinations.length===0?<div className="empty-state"><Compass size={35}/><h3>条件内の候補が見つかりませんでした</h3><p>時間・距離を広げるか、目的地の種類・移動手段を変更してください。<br/>未対応の地域・交通手段では結果が出ない場合があります。</p></div>:result.destinations.map((d,i)=><DestinationCard key={d.id} destination={d} index={i} selected={selectedId===d.id} onSelect={onSelect} roundTrip={result.input.roundTrip}/>) }
