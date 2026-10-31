@@ -17,7 +17,7 @@ export default {
    }
    if(googleMode&&path==='/admin/google/callback') {
     if(request.method!=='GET')return new Response(null,{status:405});
-    try{const cookie=await finishGoogleLogin(request,env);const response=redirect('/admin',cookie);response.headers.append('Set-Cookie',clearGoogleFlow);response.headers.set('Referrer-Policy','no-referrer');return response;}
+    try{const cookie=await finishGoogleLogin(request,env);const response=new Response('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=/admin"><title>ログイン完了</title><p>ログインしました。<a href="/admin">管理画面へ進む</a></p></html>',{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store','Set-Cookie':cookie,'Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'"}});response.headers.append('Set-Cookie',clearGoogleFlow);response.headers.set('Referrer-Policy','no-referrer');return response;}
     catch{const response=authPage('Google認証に失敗したか、管理者として許可されていないアカウントです。再度ログインしてください。',false,true);response.headers.append('Set-Cookie',clearGoogleFlow);return response;}
    }
    if(path==='/admin/login') {

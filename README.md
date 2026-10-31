@@ -5,7 +5,7 @@
 ## 利用範囲
 
 - `/`: 匿名の公開デモ。Google APIの検索・地図を呼びません。
-- `/admin/`: 管理者パスワードで本人のみ実検索。Zero Trust契約不要。
+- `/admin/`: Googleアカウントで本人のみ実検索。Zero Trust契約不要。
 - 管理者ログインの有効期限は8時間。HttpOnly/Secure/SameSite=Strict Cookieを使用。
 - POSTは同一Originのみ。外部からの本人ヘッダーは削除します。
 - ログインはIPごと5回/60秒（Cloudflare拠点ごとの近似制限。世界共通の厳密な上限ではありません）。
@@ -49,4 +49,4 @@ pnpm deploy
 
 ## Googleアカウント認証への移行
 
-実装は準備済みです。[設定手順](docs/GOOGLE_LOGIN.md)に従ってOAuthクライアントを登録し、ADMIN_AUTH_MODE=googleへ切り替えます。設定完了までは現在のパスワード認証を維持します。Googleモードでは旧パスワード認証を受け付けません。
+Google OAuth設定を登録し、Googleログイン版を公開済みです。[設定手順](docs/GOOGLE_LOGIN.md)に従ってOAuthクライアントを登録し、ADMIN_AUTH_MODE=googleへ切り替えます。現在はADMIN_AUTH_MODE=googleで稼働しています。Googleモードでは旧パスワード認証を受け付けません。

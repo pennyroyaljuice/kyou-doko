@@ -38,3 +38,7 @@ Google認証を使う場合もアプリのログアウトはアプリのセッ�
 公開デモのGoogle API非利用・実検索の本人制限は維持します。Google本番認証の確認前に切り替え完了とは扱いません。
 
 公式資料：https://developers.google.com/identity/openid-connect/openid-connect
+
+## 公開先の確認結果（2026-10-31）
+
+OAuth設定をSecretsへ登録し、Google認証モードで公開済み。実際のGoogle本人アカウントからのログイン、自動復帰、ログアウト、再ログインを確認。旧パスワードPOSTは405、匿名管理者APIは401です。Strict Cookieを維持するためコールバックは200の同一サイトページを挟み管理画面へ進みます。
