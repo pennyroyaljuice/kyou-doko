@@ -1,0 +1,11 @@
+import {it,expect} from 'vitest';
+import {keyHash,redeemKey,cleanKeys,type ResetKeys} from '../lib/reset-keys';
+import {decideUsage,type UsageState} from '../lib/usage-policy';
+const now=Date.parse('2026-11-01T12:00:00+09:00');
+const usage=():UsageState=>({days:{'2026-11-01':{search:40,photo:500,map:0,users:{a:10,b:10}}}});
+const keys=():ResetKeys=>({keys:{valid:{created:now,expires:now+1000}},attempts:{}});
+it('本人のみ戻し、全体枠・実績・他人枠は保持し再利用不可',()=>{const s=usage(),k=keys();expect(redeemKey(k,s,'valid','a',now).ok).toBe(true);const r=decideUsage(s,'a','search',now,false);expect(r.remaining).toBe(10);expect(r.allowed).toBe(false);expect(s.days['2026-11-01'].search).toBe(40);expect(s.days['2026-11-01'].photo).toBe(500);expect(decideUsage(s,'b','search',now,false).remaining).toBe(0);expect(redeemKey(k,s,'valid','b',now).ok).toBe(false);});
+it('期限切れ・無効キーでは戻らない',()=>{const s=usage(),k=keys();expect(redeemKey(k,s,'valid','a',now+1000).ok).toBe(false);expect(redeemKey(k,s,'missing','a',now).ok).toBe(false);expect(decideUsage(s,'a','search',now,false).remaining).toBe(0);});
+it('入力は日次10回までで翌日更新',()=>{const s=usage(),k=keys();for(let i=0;i<10;i++)redeemKey(k,s,'bad','a',now);expect(redeemKey(k,s,'valid','a',now).ok).toBe(false);cleanKeys(k,now+86400000);expect(k.attempts.a).toBeUndefined();});
+it('未検索の利用者でも消費し一度しか使えない',()=>{const s:UsageState={days:{}},k=keys();expect(redeemKey(k,s,'valid','new',now).ok).toBe(true);expect(redeemKey(k,s,'valid','new',now).ok).toBe(false);});
+it('キーの大文字小文字と区切りを正規化してハッシュ化',async()=>{expect(await keyHash('ABCD-1234')).toBe(await keyHash('abcd1234'));expect(await keyHash('ABCD-1234')).not.toContain('ABCD');});

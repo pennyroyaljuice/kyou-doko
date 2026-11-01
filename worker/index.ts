@@ -1,6 +1,6 @@
 import {excludedIds,type Preferences} from '../lib/preferences';
 export { UsageBudget } from './usage';
-import {checkUsage,resetBudget,preferenceStore,type UsageEnvironment} from './usage';
+import {checkUsage,resetBudget,resetKeyRequest,preferenceStore,type UsageEnvironment} from './usage';
 import {parseInput} from '../lib/domain';
 import { servePhoto, type PhotoEnvironment } from '../lib/photos';
 import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleSessionIdentity, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
@@ -21,7 +21,14 @@ export default {
    if(request.method==='POST'&&!sameOrigin(request))return new Response(null,{status:403});
    try{const raw=request.method==='POST'?await request.text():undefined;if(raw&&raw.length>1024)return new Response(null,{status:413});const store=await preferenceStore(env,identity!.sub);const response=await store.fetch('https://usage.internal/preferences',{method:request.method,...(raw?{body:raw}:{})});return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'除外設定を読み込めませんでした。時間をおいてお試しください。'},{status:503});}
   }
+  if(path==='/admin/api/reset-keys'||path==='/api/usage/redeem'){
+   if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+   const issue=path==='/admin/api/reset-keys';if(issue&&!identity!.isOwner)return new Response(null,{status:403});
+   if(request.method!=='POST')return new Response(null,{status:405});if(!sameOrigin(request))return new Response(null,{status:403});
+   try{const raw=await request.text();if(raw.length>512)return new Response(null,{status:413});const body=JSON.parse(raw);if(!issue&&typeof body.code!=='string')return new Response(null,{status:400});const response=await resetKeyRequest(env,identity!.sub,issue,body.code);return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'キーを処理できませんでした。'},{status:503});}
+  }
   if(path==='/admin/api/usage/reset'){
+
    if(!identity)return Response.json({error:'管理者ログインが必要です。'},{status:401});
    if(!identity.isOwner)return new Response(null,{status:403});
    if(request.method!=='POST')return new Response(null,{status:405});
