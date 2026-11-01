@@ -1,8 +1,12 @@
 import {emptyPreferences,updatePreferences,type Preferences} from '../lib/preferences';
-import {decideUsage,type UsageKind,type UsageState} from '../lib/usage-policy';
+import {decideUsage,resetUsage,type ResetScope,type UsageKind,type UsageState} from '../lib/usage-policy';
 export class UsageBudget {
  constructor(private state:DurableObjectState){}
  async fetch(request:Request){
+  if(new URL(request.url).pathname==='/reset'){
+   if(request.method!=='POST')return new Response(null,{status:405});
+   try{const body=await request.json() as {scope:ResetScope;actor:string;subject?:string};if(!/^[a-f0-9]{64}$/.test(body.actor)||body.subject&&!/^[a-f0-9]{64}$/.test(body.subject))return new Response(null,{status:400});await this.state.storage.transaction(async tx=>{const state=await tx.get<UsageState>('usage')??{days:{}};resetUsage(state,body.scope,body.actor,Date.now(),body.subject);await tx.put('usage',state);});return Response.json({ok:true});}catch(e){return Response.json({error:e instanceof Error?e.message:'リセットできませんでした。'},{status:400});}
+  }
   if(new URL(request.url).pathname==='/preferences'){
    if(request.method==='GET')return Response.json(await this.state.storage.get<Preferences>('preferences')??emptyPreferences());
    if(request.method!=='POST')return new Response(null,{status:405});
@@ -34,4 +38,10 @@ export async function preferenceStore(env:UsageEnvironment,sub:string){
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));
  const id=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
  return env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('preferences-v1:'+id));
+}
+
+export async function resetBudget(env:UsageEnvironment,sub:string,scope:ResetScope,subject?:string){
+ if(!env.USAGE_BUDGET)throw Error('Usage budget unavailable');
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));const actor=[...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
+ return env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('global-v1')).fetch('https://usage.internal/reset',{method:'POST',body:JSON.stringify({scope,subject,actor})});
 }

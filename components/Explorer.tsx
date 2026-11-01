@@ -5,6 +5,7 @@ import type { Mode, Point, SearchInput, SearchResult } from '@/lib/domain';
 import { themeLabels, type DestinationTheme } from '@/lib/themes';
 import { googleMapsUrl } from '@/lib/navigation';
 import PlacePreferences,{usePlacePreferences} from './PlacePreferences';
+import AdminUsage from './AdminUsage';
 import MapView from './MapView';
 import DestinationCard from './DestinationCard';
 import YahooNavigation from './YahooNavigation';
@@ -74,8 +75,9 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       </section>
       {searchBlocked&&<div id="search-blocked-reason" className="setup-banner" role="status"><span>{blockedReason}</span></div>}
       {publicEnabled&&!signedIn&&<div className="setup-banner"><span>Googleログインで1日10回まで検索できます（日本時間0時更新）。</span><a href="/login">Googleでログイン</a></div>}
-      {signedIn&&usage&&<div className="usage-notice" role="status">{isOwner?'管理者 · 利用回数の制限なし':<>無料プラン · 本日の検索 あと{usage.remaining}回 / 10回（日本時間0時更新）</>}{isOwner&&usage.rolling&&<span> · 一般：本日{usage.dailySearches}/40回、直近32日{usage.rolling.search}/400回 · 管理者：本日{usage.dailyAdminSearches??0}回、直近32日{usage.adminRolling?.search??0}回</span>}{!isOwner&&<small>検索開始時に消費します。0件・通信失敗でも回数は戻りません。サービス全体の上限で停止する場合があります。</small>}<button className="text-button" onClick={()=>void refreshUsage()}>利用状況を更新</button></div>}
+      {signedIn&&usage&&<div className="usage-notice" role="status">{isOwner?'管理者 · 利用回数の制限なし':<>無料プラン · 本日の検索 あと{usage.remaining}回 / 10回（日本時間0時更新）</>}{isOwner&&usage.rolling&&<span> · 一般利用実績：本日{usage.dailySearches}回、直近32日{usage.rolling.search}回 · 管理者：本日{usage.dailyAdminSearches??0}回、直近32日{usage.adminRolling?.search??0}回</span>}{!isOwner&&<small>検索開始時に消費します。0件・通信失敗でも回数は戻りません。サービス全体の上限で停止する場合があります。</small>}<button className="text-button" onClick={()=>void refreshUsage()}>利用状況を更新</button></div>}
       {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/admin/setup">設定手順</a></div>}
+      {isOwner&&<AdminUsage onReset={()=>void refreshUsage()}/>}
       {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>

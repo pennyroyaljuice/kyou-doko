@@ -1,6 +1,6 @@
 import {excludedIds,type Preferences} from '../lib/preferences';
 export { UsageBudget } from './usage';
-import {checkUsage,preferenceStore,type UsageEnvironment} from './usage';
+import {checkUsage,resetBudget,preferenceStore,type UsageEnvironment} from './usage';
 import {parseInput} from '../lib/domain';
 import { servePhoto, type PhotoEnvironment } from '../lib/photos';
 import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleSessionIdentity, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
@@ -20,6 +20,13 @@ export default {
    if(!['GET','POST'].includes(request.method))return new Response(null,{status:405});
    if(request.method==='POST'&&!sameOrigin(request))return new Response(null,{status:403});
    try{const raw=request.method==='POST'?await request.text():undefined;if(raw&&raw.length>1024)return new Response(null,{status:413});const store=await preferenceStore(env,identity!.sub);const response=await store.fetch('https://usage.internal/preferences',{method:request.method,...(raw?{body:raw}:{})});return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'除外設定を読み込めませんでした。時間をおいてお試しください。'},{status:503});}
+  }
+  if(path==='/admin/api/usage/reset'){
+   if(!identity)return Response.json({error:'管理者ログインが必要です。'},{status:401});
+   if(!identity.isOwner)return new Response(null,{status:403});
+   if(request.method!=='POST')return new Response(null,{status:405});
+   if(!sameOrigin(request))return new Response(null,{status:403});
+   try{const raw=await request.text();if(raw.length>1024)return new Response(null,{status:413});const body=JSON.parse(raw);if(body.confirm!==true)return Response.json({error:'リセット内容を確認してください。'},{status:400});const response=await resetBudget(env,identity.sub,body.scope,body.subject);return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'リセットできませんでした。時間をおいてお試しください。'},{status:503});}
   }
   if(path==='/login')return env.PUBLIC_SEARCH_ENABLED==='true'?authPage('',false,true,true):redirect('/admin/login');
   if(path==='/logout')return redirect('/admin/logout');
