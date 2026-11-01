@@ -85,7 +85,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       {searchBlocked&&<div id="search-blocked-reason" className="setup-banner" role="status"><span>{blockedReason}</span></div>}
       {publicEnabled&&!signedIn&&<div className="setup-banner"><span>Googleログインで1日5回まで検索できます（日本時間0時更新）。</span><a href="/login">Googleでログイン</a></div>}
       {signedIn&&<section className="usage-panel" aria-labelledby="usage-heading">
-        <div className="usage-panel-header"><h2 id="usage-heading">利用状況</h2><span className="usage-status" role="status">{isOwner?'管理者 · 回数制限なし':usage?<>本日の検索 あと<strong>{usage.remaining}</strong>回 / 5回</>:'利用状況を確認中…'}</span><button className="text-button" onClick={()=>void refreshUsage()}>更新</button></div>
+        <div className="usage-panel-header"><h2 id="usage-heading">利用状況</h2><span className="usage-status" role="status">{isOwner?'管理者 · 回数制限なし':usage?<>本日の検索 あと<strong>{usage.remaining}</strong>回 / 5回</>:'利用状況を確認中…'}</span><button className="usage-refresh-button" onClick={()=>void refreshUsage()}><RefreshCw size={16}/>更新</button></div>
         {isOwner&&usage?.rolling?<div className="usage-statistics"><span>一般：本日{usage.dailySearches}回 · 直近32日{usage.rolling.search}回</span><span>管理者：本日{usage.dailyAdminSearches??0}回 · 直近32日{usage.adminRolling?.search??0}回</span></div>:!isOwner&&<p className="usage-reset-time">日本時間0時更新</p>}
         <div className="usage-panel-tools">{isOwner&&<AdminUsage refreshVersion={usage} onReset={()=>void refreshUsage()}/>}<ResetKey owner={isOwner} onReset={()=>void refreshUsage()}/></div>
       </section>}

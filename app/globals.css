@@ -105,3 +105,6 @@
 .destination-shell>.destination-card,.destination-shell>.destination-card.selected{border:0;border-radius:8px 8px 0 0;box-shadow:none;background:transparent}
 .destination-shell .card-footer{margin:0 14px;padding:8px 0 12px;border-top:1px solid #edf1eb}
 @media(max-width:560px){.destination-shell .card-footer{margin:0 12px;padding:8px 0 10px}}
+
+.usage-refresh-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:88px;min-height:44px;margin-left:auto;padding:10px 16px;border:1px solid #a5b9ab;border-radius:8px;background:#f1f6ee;color:var(--green);font-size:12px;font-weight:600}
+.usage-refresh-button:hover{background:#e6efdf}.usage-refresh-button:active{background:#dce9d4}
