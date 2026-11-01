@@ -61,7 +61,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     setSelectedId(result.destinations[(current+1)%result.destinations.length].id);
   }
   return <>
-    <header className="site-header"><a className="brand" href="/"><span className="brand-mark"><Compass size={23}/></span>ココからドコへ<span className="brand-question">？</span></a><div className="header-right"><span className="edition">{isOwner?'管理者':signedIn?'無料アカウント':'未ログイン'}</span>{signedIn?<a className="account-link" href="/admin/logout" target="_top">ログアウト</a>:<a className="account-link" href={publicEnabled?'/login':'/admin/'} target="_top">{publicEnabled?'Googleでログイン':'管理者ログイン'}</a>}</div></header>
+    <header className="site-header"><a className="brand" href="/"><img className="brand-logo" src="/brand-logo.png" alt="ココからドコへ？" width="300" height="100"/></a><div className="header-right"><span className="edition">{isOwner?'管理者':signedIn?'無料アカウント':'未ログイン'}</span>{signedIn?<a className="account-link" href="/admin/logout" target="_top">ログアウト</a>:<a className="account-link" href={publicEnabled?'/login':'/admin/'} target="_top">{publicEnabled?'Googleでログイン':'管理者ログイン'}</a>}</div></header>
     <main>
       <section className="search-panel" aria-labelledby="search-heading">
         <div className="panel-top"><h1 id="search-heading"><SlidersHorizontal size={17}/>検索条件</h1></div>

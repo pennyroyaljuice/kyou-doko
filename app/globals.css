@@ -44,3 +44,7 @@
 
 /* Keep concise conditions and the submit action together. */
 .conditions{padding-bottom:16px}.search-actions{display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:12px 22px;border-top:1px solid #e4e9e5;background:#fcfdf9}.search-actions .destination-preference{flex:1;margin:0;padding:0;border:0;gap:10px}.search-actions .search-bottom{flex:none;padding:0;border:0;background:transparent}.search-actions .search-button{margin:0}.highway-option{margin-top:10px}.usage-notice+.place-preferences{margin-top:12px}.result-summary{margin-bottom:12px}@media(max-width:600px){.search-actions{padding:12px 16px;gap:12px}.search-actions .destination-preference{flex-basis:100%}.search-actions .search-bottom{margin-left:auto}.conditions{padding-bottom:14px}}
+
+.brand-logo{display:block;width:260px;height:auto;max-height:56px;object-fit:contain}.brand{flex-shrink:0}@media(max-width:560px){.brand-logo{width:184px;max-height:46px}.site-header{gap:8px}.header-right{justify-content:flex-end;gap:6px}}@media(max-width:360px){.brand-logo{width:158px}}
+
+.brand-logo{width:230px;height:56px;max-height:none;object-fit:cover}@media(max-width:560px){.brand-logo{width:184px;height:46px;max-height:none}}@media(max-width:360px){.brand-logo{width:158px;height:40px}}
