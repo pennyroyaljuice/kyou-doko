@@ -34,9 +34,9 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
       await refill();
     }
     const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
-    const target=factor?input.budget*0.85:radius(input)*explorationFraction(input);
+    const target=factor?Math.max(input.minBudget??0,input.budget*0.85):radius(input)*explorationFraction(input);
     const score=(p:typeof places[number])=>Math.abs(distance(origin.point,p.point)*(factor??1)-target);
-    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||distance(origin.point,p.point)*factor<=input.budget;
+    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||(distance(origin.point,p.point)*factor<=input.budget&&distance(origin.point,p.point)*factor>=(input.minBudget??0));
     // Defer predicted over-budget candidates, but still check them if needed; never fabricate or reject a route on this estimate alone.
     const preferred=pending.filter(withinEstimate),reserve=pending.filter(p=>!withinEstimate(p));
     const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts);

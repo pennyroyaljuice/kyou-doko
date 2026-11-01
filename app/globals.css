@@ -108,3 +108,15 @@
 
 .usage-refresh-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:88px;min-height:44px;margin-left:auto;padding:10px 16px;border:1px solid #a5b9ab;border-radius:8px;background:#f1f6ee;color:var(--green);font-size:12px;font-weight:600}
 .usage-refresh-button:hover{background:#e6efdf}.usage-refresh-button:active{background:#dce9d4}
+
+/* Optional lower bound and primary upper bound share a single range row. */
+.budget-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.budget-heading label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;white-space:nowrap}
+.budget-toggles{display:flex;gap:7px}.budget-toggles .condition-toggle{min-width:76px;min-height:44px;padding:8px;font-size:12px}
+.budget-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}
+.range-input{display:flex;align-items:center;gap:5px;min-width:0;min-height:52px;border-bottom:1px solid #d9e0d2}.range-upper{border-bottom-color:var(--green)}
+.range-input input{width:100%;min-width:0;border:0;background:transparent;font-size:32px;color:var(--ink);padding:3px 0;outline:none}.range-input input:focus-visible{outline:2px solid #de9d6c;outline-offset:2px;border-radius:3px}
+.range-input input::placeholder{font-size:12px;color:#8e998f}.range-input>span{font-size:11px;color:#7e897a;white-space:nowrap}.range-separator{font-size:15px;color:#7e897a}
+@media(max-width:600px){.budget-heading{gap:7px}.budget-heading label{font-size:10px;gap:5px}.budget-toggles{gap:5px}.budget-toggles .condition-toggle{min-width:58px;min-height:44px;padding:7px 5px;font-size:11px;gap:4px}.budget-range{gap:8px}.range-input input{font-size:28px}.range-input input::placeholder{font-size:10px}}
+
+.range-upper input{font-weight:600}
