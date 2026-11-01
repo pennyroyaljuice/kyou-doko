@@ -31,7 +31,7 @@ export class GoogleProvider implements DiscoveryProvider {
   }
   async nearby(origin: Point, radius: number, theme: DestinationTheme = 'all', rankPreference: 'POPULARITY'|'DISTANCE' = 'POPULARITY'): Promise<Place[]> {
     const data = await this.request<{places?:GooglePlace[]}>('https://places.googleapis.com/v1/places:searchNearby',{
-      ...themeFilter(theme),maxResultCount:8,languageCode:'ja',rankPreference,locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
+      ...themeFilter(theme),maxResultCount:20,languageCode:'ja',rankPreference,locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
     },fields);
     return Promise.all((data.places??[]).filter(p=>p.location && matchesTheme(p.types,theme,p.primaryType)).map(async p=>({id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri})),photo:await this.photo(p)})));
   }
@@ -40,7 +40,7 @@ export class GoogleProvider implements DiscoveryProvider {
     const areas=explorationAreas(origin,input);
     // Two concurrent requests; four total, without unbounded expansion or retries.
     for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE'))));
-    return explorationCandidates(groups,origin,input);
+    return explorationCandidates(groups,origin,input,80);
   }
   private async photo(place:GooglePlace) {
     const first=place.photos?.[0],secret=this.key;
