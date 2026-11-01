@@ -1,5 +1,5 @@
 export type UsageKind='search'|'photo'|'map';
-export const usagePolicy={plan:'free',userDaily:5,searchDaily:40,searchRolling:400,ratingRolling:200,photoRolling:500,mapRolling:1000,windowDays:32} as const;
+export const usagePolicy={plan:'free',userDaily:5,searchDaily:40,searchRolling:400,ratingRolling:160,photoRolling:500,mapRolling:1000,windowDays:32} as const;
 export type UsageDay={ratingSearch?:number;adminRatingSearch?:number;search:number;photo:number;map:number;users:Record<string,number>;reset?:{dailySearch?:number;rollingSearch?:number;photo?:number;users?:Record<string,number>};admin?:{search:number;photo:number;map:number}};
 export type UsageState={days:Record<string,UsageDay>;adminSubjects?:string[];resetLog?:{at:number;actor:string;scope:string;subject?:string}[]};
 export function usageDate(now:number){return new Date(now+9*3600000).toISOString().slice(0,10);}

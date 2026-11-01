@@ -1,7 +1,7 @@
 import { explorationAreas, explorationCandidates } from './exploration';
 import { themeFilter, matchesTheme, type DestinationTheme } from './themes';
 import { photoTicket } from './photos';
-import { AppError, isPoint, type Point, type Place, type Leg, type Mode, type SearchInput } from './domain';
+import { AppError, isPoint, radius, type Point, type Place, type Leg, type Mode, type SearchInput } from './domain';
 import type { DiscoveryProvider } from './providers';
 type GooglePlace = { rating?:number; userRatingCount?:number; types?: string[]; primaryType?: string; photos?: {name:string;authorAttributions?:{displayName:string;uri?:string}[]}[]; id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
 const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.types,places.primaryType,places.attributions,places.photos';
@@ -41,6 +41,9 @@ export class GoogleProvider implements DiscoveryProvider {
     // Two concurrent requests; four total, without unbounded expansion or retries.
     for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE',this.includeRatings))));
     return explorationCandidates(groups,origin,input,80);
+  }
+  async fallback(origin:Point,input:SearchInput):Promise<Place[]> {
+    return this.nearby(origin,Math.min(50000,radius(input)),input.theme,'POPULARITY',this.includeRatings);
   }
   private async photo(place:GooglePlace) {
     const first=place.photos?.[0],secret=this.key;

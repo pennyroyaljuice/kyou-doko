@@ -6,32 +6,52 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const origin = await provider.resolve(input.origin);
   const discovered = (provider.discover ? await provider.discover(origin.point,input) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
-  const places=discovered.filter(p=>!excluded.has(p.id)).slice(0,80);
+  let places=discovered.filter(p=>!excluded.has(p.id)).slice(0,80);
   let unavailable = 0;
   const items:Destination[] = [];
   const start = new Date();
   const routeMode=input.mode==='BICYCLE'?'WALK':input.mode;
   const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
   // Reserve a bounded route budget; retain discovery reserves for rejected candidates.
-  let routeCalls=0;const routeLimit=20;
-  for (let i=0;i<places.length&&items.length<8&&routeCalls<routeLimit;i+=2) {
+  let routeCalls=0;const routeLimit=24;
+  let fallbackUsed=false,failed=0;
+  const estimates:number[]=[];
+  async function refill(){
+    if(fallbackUsed||!provider.fallback)return;fallbackUsed=true;
+    let extra:Awaited<ReturnType<NonNullable<typeof provider.fallback>>>;
+    try{extra=await provider.fallback(origin.point,input);}catch{return;}
+    const seen=new Set(places.map(p=>p.id));
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&distance(origin.point,p.point)<=radius(input)){seen.add(p.id);places.push(p);}
+  }
+  for (let i=0;items.length<8&&routeCalls<routeLimit;i+=2) {
+    if(items.length<8&&((i>=2&&failed>=2)||i>=places.length)){
+      await refill();
+      if(failed>=2){
+        const factor=estimates.length?estimates.reduce((a,b)=>a+b,0)/estimates.length:1;
+        const target=input.budget*0.85;
+        places=[...places.slice(0,i),...places.slice(i).sort((a,b)=>Math.abs(distance(origin.point,a.point)*factor-target)-Math.abs(distance(origin.point,b.point)*factor-target))];
+      }
+    }
+    if(i>=places.length)break;
     const batch = await Promise.all(places.slice(i,i+2).map(async p=>{
       if (input.metric === 'distance' && distance(origin.point,p.point)*(input.roundTrip?2:1)>input.budget*1000) return null;
       if(routeCalls>=routeLimit)return null;routeCalls++;
       const outbound = await getLeg(origin.point,p.point,start);
-      if (!outbound) { unavailable++; return null; }
+      if (!outbound) { failed++;unavailable++; return null; }
       const outboundValue=input.metric==='time'?outbound.seconds/60:outbound.meters/1000;
-      if(outboundValue>input.budget)return null;
+      const direct=distance(origin.point,p.point);
+      if(direct>100)estimates.push(outboundValue*(input.roundTrip?2:1)/direct);
+      if(outboundValue>input.budget){failed++;return null;}
       if(input.roundTrip&&routeCalls>=routeLimit)return null;
       if(input.roundTrip)routeCalls++;
       const inbound = input.roundTrip ? await getLeg(p.point,origin.point,new Date(start.getTime()+outbound.seconds*1000)) : undefined;
-      if (input.roundTrip && !inbound) { unavailable++; return null; }
+      if (input.roundTrip && !inbound) { failed++;unavailable++; return null; }
       const result=totals(p,outbound,inbound??undefined);
-      return rank([result],input).length?result:null;
+      if(!rank([result],input).length){failed++;return null;}return result;
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));
   }
-  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の4か所で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大20回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
+  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の最大5か所で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
   if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。追加の自動検索は行いません。`);
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
