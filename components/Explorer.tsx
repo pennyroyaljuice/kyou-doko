@@ -5,12 +5,11 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Waves, X } from 'lucide-react';
 import {sortDestinations,type Mode,type Point,type SearchInput,type SearchResult } from '@/lib/domain';
 import { themeLabels, type DestinationTheme } from '@/lib/themes';
-import { googleMapsUrl } from '@/lib/navigation';
 import PlacePreferences,{usePlacePreferences} from './PlacePreferences';
 import AdminUsage from './AdminUsage';
 import MapView from './MapView';
 import DestinationCard from './DestinationCard';
-import YahooNavigation from './YahooNavigation';
+import PlaceLinks from './PlaceLinks';
 import { getCurrentLocation } from '@/lib/location';
 const modes = [{id:'DRIVE',name:'車',icon:Car},{id:'BICYCLE',name:'自転車',icon:Bike},{id:'WALK',name:'徒歩',icon:Footprints}] as const;
 const minutes=(s:number)=>`${Math.ceil(s/60)}分`;
@@ -102,7 +101,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
             {result&&<div className="load-more"><button className="load-more-button" onClick={()=>void submit(true)} disabled={busy||searchBlocked||result.destinations.length>=500}>{adding?<><RefreshCw size={16} className="spin"/>追加で探しています…</>:<>さらに調べる <RefreshCw size={16}/></>}</button>{additionalMessage&&<p role="status">{additionalMessage}</p>}</div>}
           </div>
           <div className="map-and-detail"><div className="map-container"><MapView result={result} selected={selected} onSelect={onSelect}/><div className="map-top-label"><MapPin size={13}/>{result?'Google Maps':'目的地の位置'}</div></div>
-            {selected&&result?<div className="route-detail"><div className="detail-heading"><div><span className="spot-category">{result.input.mode==='BICYCLE'?'自転車の推定値 · 徒歩経路ベース':'移動の目安'}</span><h3>{selected.name}</h3></div><Navigation size={22}/></div><div className="route-stats"><div><Clock3 size={17}/><strong>{minutes(selected.seconds)}</strong><small>{result.input.roundTrip?'往復合計':'片道'}</small></div><div><Route size={17}/><strong>{km(selected.meters)}</strong></div></div>{selected.inbound&&<p className="leg-summary">往路 {minutes(selected.outbound.seconds)} / {km(selected.outbound.meters)} <ArrowRight size={12}/> 復路 {minutes(selected.inbound.seconds)} / {km(selected.inbound.meters)}</p>}<a className="nav-link" href={googleMapsUrl(result.origin,selected.point,result.input.mode,[],result.input.avoidHighways)} target="_blank" rel="noopener noreferrer">Google Mapsで往路を開く <ArrowUpRight size={17}/></a><div className="secondary-nav">{selected.inbound&&<a href={googleMapsUrl(selected.point,result.origin,result.input.mode,[],result.input.avoidHighways)} target="_blank" rel="noopener noreferrer">Google Mapsで復路 ↗</a>}</div><p className="nav-note">外部ナビではルート・所要時間が再計算されます。{result.input.mode==='DRIVE'&&'高速道路の設定は外部ナビでも確認してください。'}</p>{result.input.mode==='DRIVE'&&<YahooNavigation origin={result.origin} originLabel={result.originLabel} destination={selected.point} name={selected.name} roundTrip={result.input.roundTrip} avoidHighways={result.input.avoidHighways} demo={false}/>} {selected.attributions?.map(a=><p key={a.name} className="attribution"><a href={/^https?:/.test(a.uri)?a.uri:undefined} target="_blank" rel="noopener noreferrer">{a.name}</a></p>)}</div>:<div className="map-placeholder-note"><p>候補を選ぶと移動時間・距離と外部ナビを表示します。</p></div>}
+            {selected&&result?<div className="route-detail"><div className="detail-heading"><div><span className="spot-category">{result.input.mode==='BICYCLE'?'自転車の推定値 · 徒歩経路ベース':'移動の目安'}</span><h3>{selected.name}</h3></div><Navigation size={22}/></div><div className="route-stats"><div><Clock3 size={17}/><strong>{minutes(selected.seconds)}</strong><small>{result.input.roundTrip?'往復合計':'片道'}</small></div><div><Route size={17}/><strong>{km(selected.meters)}</strong></div></div>{selected.inbound&&<p className="leg-summary">往路 {minutes(selected.outbound.seconds)} / {km(selected.outbound.meters)} <ArrowRight size={12}/> 復路 {minutes(selected.inbound.seconds)} / {km(selected.inbound.meters)}</p>}<PlaceLinks destination={selected}/> {selected.attributions?.map(a=><p key={a.name} className="attribution"><a href={/^https?:/.test(a.uri)?a.uri:undefined} target="_blank" rel="noopener noreferrer">{a.name}</a></p>)}</div>:<div className="map-placeholder-note"><p>候補を選ぶと移動時間・距離と場所のリンクを表示します。</p></div>}
           </div>
         </div>
 

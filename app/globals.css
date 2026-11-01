@@ -83,3 +83,5 @@
 @media(max-width:600px){.theme-switch{width:100%;gap:3px;grid-template-columns:minmax(0,3fr) minmax(0,7fr) minmax(0,5fr) minmax(0,3fr) minmax(0,5fr)}.theme-switch button{padding:10px 2px;font-size:clamp(9px,2.6vw,11px);letter-spacing:0}}
 
 .search-actions .destination-preference{flex:1 1 650px}
+
+.place-links{display:flex;flex-direction:column;gap:10px}.place-links .nav-link{margin-top:0}.place-links .nav-note{margin-top:0}

@@ -31,7 +31,8 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     if(items.length<8&&((i>=2&&failed>=2)||i>=places.length)){
       await refill();
       if(failed>=2){
-        const factor=estimates.length?estimates.reduce((a,b)=>a+b,0)/estimates.length:1;
+        const measured=[...estimates].sort((a,b)=>a-b);
+        const factor=measured.length?measured[Math.floor(measured.length/2)]:1;
         const target=input.budget*0.85;
         places=[...places.slice(0,i),...places.slice(i).sort((a,b)=>ratingPriority(a,b)||Math.abs(distance(origin.point,a.point)*factor-target)-Math.abs(distance(origin.point,b.point)*factor-target))];
       }
@@ -45,13 +46,14 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
       if (!outbound) { failed++;unavailable++; return null; }
       const outboundValue=input.metric==='time'?outbound.seconds/60:outbound.meters/1000;
       const direct=distance(origin.point,p.point);
-      if(direct>100)estimates.push(outboundValue*(input.roundTrip?2:1)/direct);
-      if(outboundValue>input.budget){failed++;return null;}
+      if(outboundValue>input.budget){if(direct>100)estimates.push(outboundValue*(input.roundTrip?2:1)/direct);failed++;return null;}
       if(input.roundTrip&&routeCalls>=routeLimit)return null;
       if(input.roundTrip)routeCalls++;
       const inbound = input.roundTrip ? await getLeg(p.point,origin.point,new Date(start.getTime()+outbound.seconds*1000)) : undefined;
       if (input.roundTrip && !inbound) { failed++;unavailable++; return null; }
       const result=totals(p,outbound,inbound??undefined);
+      const actualValue=input.metric==='time'?result.seconds/60:result.meters/1000;
+      if(direct>100)estimates.push(actualValue/direct);
       if(!rank([result],input).length){failed++;return null;}return result;
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));

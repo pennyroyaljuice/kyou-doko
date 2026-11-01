@@ -1,4 +1,4 @@
-import type { Mode, Point } from './domain';
+import type { Mode, Point, Place } from './domain';
 const coord = (p:Point)=>`${p.lat},${p.lng}`;
 export function googleMapsUrl(origin:Point,destination:Point,mode:Mode,waypoints:Point[]=[],avoidHighways=false) {
   const q = new URLSearchParams({api:'1',origin:coord(origin),destination:coord(destination),travelmode:{DRIVE:'driving',TRANSIT:'transit',BICYCLE:'bicycling',WALK:'walking'}[mode]});
@@ -18,3 +18,8 @@ export function yahooRouteUrl(origin:Point|'current',destination:Point,name:stri
   q.append('point',coord(destination)+','+name);
   return 'yjcarnavi://navi/select?'+q;
 }
+
+export function googlePlaceUrl(place:Pick<Place,'id'|'name'|'description'>){
+ const q=new URLSearchParams({api:'1',query:[place.name,place.description].filter(Boolean).join(' ')});if(place.id)q.set('query_place_id',place.id);return 'https://www.google.com/maps/search/?'+q;
+}
+export function yahooPlaceUrl(place:Pick<Place,'name'|'description'>){return 'https://map.yahoo.co.jp/search?'+new URLSearchParams({q:[place.name,place.description].filter(Boolean).join(' ')});}
