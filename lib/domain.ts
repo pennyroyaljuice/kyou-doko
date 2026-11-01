@@ -21,7 +21,7 @@ export function parseInput(v: unknown): SearchInput {
   const min = x.metric === 'time' ? 5 : 1, max = x.metric === 'time' ? 480 : 300;
   if (typeof x.budget !== 'number' || !Number.isFinite(x.budget) || x.budget < min || x.budget > max) throw new AppError(`上限は${min}〜${max}${x.metric === 'time' ? '分' : 'km'}で指定してください。`);
   if (x.avoidHighways !== undefined && typeof x.avoidHighways !== 'boolean') throw new AppError('高速道路の設定が正しくありません。');
-  if (x.theme !== undefined && !['all','tourism','nature'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
+  if (x.theme !== undefined && !['all','tourism','nature','highrated'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
   if(x.sort!==undefined&&!['budget','rating'].includes(x.sort))throw new AppError('並び順が正しくありません。');
   return { sort:x.sort??'budget', theme:x.theme ?? 'all', avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
 }

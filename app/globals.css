@@ -54,3 +54,5 @@
 .admin-usage input{display:block;width:100%;max-width:540px;margin:6px 0 10px;padding:10px;border:1px solid var(--line,#d7ded8);border-radius:8px;box-sizing:border-box}
 
 .sort-control{display:flex;align-items:center;gap:8px;font-size:12px}.sort-control select{max-width:170px;padding:8px;border:1px solid #d7ded8;border-radius:8px;background:white;color:inherit}.search-bottom{flex-wrap:wrap;gap:12px}.spot-rating{display:block;font-size:12px;color:#7a5917;margin:3px 0}
+
+.theme-switch{flex-wrap:wrap}.destination-preference{min-width:0}
