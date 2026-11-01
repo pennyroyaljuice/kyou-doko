@@ -1,7 +1,7 @@
 import type { DestinationTheme } from './themes';
 export type Point = { lat: number; lng: number };
 export type Mode = 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK';
-export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean; theme?: DestinationTheme; sort?: 'budget'|'rating'; seenPlaceIds?:string[]; explorationPage?:number };
+export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean; theme?: DestinationTheme; sort?: 'budget'|'rating'|'reviews'; seenPlaceIds?:string[]; explorationPage?:number };
 export type Place = { ratingsAvailable?:boolean; rating?:number; userRatingCount?:number; id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
@@ -21,8 +21,8 @@ export function parseInput(v: unknown): SearchInput {
   const min = x.metric === 'time' ? 5 : 1, max = x.metric === 'time' ? 480 : 300;
   if (typeof x.budget !== 'number' || !Number.isFinite(x.budget) || x.budget < min || x.budget > max) throw new AppError(`上限は${min}〜${max}${x.metric === 'time' ? '分' : 'km'}で指定してください。`);
   if (x.avoidHighways !== undefined && typeof x.avoidHighways !== 'boolean') throw new AppError('高速道路の設定が正しくありません。');
-  if (x.theme !== undefined && !['all','tourism','nature','highrated'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
-  if(x.sort!==undefined&&!['budget','rating'].includes(x.sort))throw new AppError('並び順が正しくありません。');
+  if (x.theme !== undefined && !['all','tourism','nature','highrated','reviews'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
+  if(x.sort!==undefined&&!['budget','rating','reviews'].includes(x.sort))throw new AppError('並び順が正しくありません。');
   if(x.seenPlaceIds!==undefined&&(!Array.isArray(x.seenPlaceIds)||x.seenPlaceIds.length>500||x.seenPlaceIds.some(id=>typeof id!=='string'||id.length<1||id.length>256)))throw new AppError('追加検索の候補情報が正しくありません。');
   if(x.explorationPage!==undefined&&(!Number.isInteger(x.explorationPage)||x.explorationPage<0||x.explorationPage>1000))throw new AppError('追加検索の情報が正しくありません。');
   return { ...(x.seenPlaceIds?{seenPlaceIds:[...new Set(x.seenPlaceIds)]}:{}),...(x.explorationPage!==undefined?{explorationPage:x.explorationPage}:{}),sort:x.sort??'budget', theme:x.theme ?? 'all', avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
@@ -44,8 +44,8 @@ export function totals(place: Place, outbound: Leg, inbound?: Leg): Destination 
   return {...place, outbound, inbound, seconds:outbound.seconds+(inbound?.seconds??0), meters:outbound.meters+(inbound?.meters??0)};
 }
 
-export function sortDestinations(items:Destination[],input:SearchInput,sort:'budget'|'rating'=input.sort??'budget'){
+export function sortDestinations(items:Destination[],input:SearchInput,sort:'budget'|'rating'|'reviews'=input.sort??'budget'){
  // Eligibility is decided once by the search. Display sorting must preserve every result.
  const value=(d:Destination)=>input.metric==='time'?d.seconds:d.meters;
- return [...items].sort((a,b)=>sort==='rating'?(b.rating??-1)-(a.rating??-1)||(b.userRatingCount??0)-(a.userRatingCount??0)||value(b)-value(a):value(b)-value(a));
+ return [...items].sort((a,b)=>sort==='reviews'?(b.userRatingCount??-1)-(a.userRatingCount??-1)||(b.rating??-1)-(a.rating??-1)||value(b)-value(a):sort==='rating'?(b.rating??-1)-(a.rating??-1)||(b.userRatingCount??0)-(a.userRatingCount??0)||value(b)-value(a):value(b)-value(a));
 }

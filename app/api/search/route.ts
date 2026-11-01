@@ -31,7 +31,7 @@ export async function POST(request:Request) {
     if (!access.isOwner && (active || Date.now()-last < 10000 || count>=30)) throw new AppError('検索回数を制限しています。10秒以上あけて再試行してください（1時間30回まで）。',429);
     if(!access.isOwner){active=true; locked=true; last=Date.now(); count++;}
     const ratingsAvailable=request.headers.get('x-kyou-ratings-approved')==='true';
-    if(input.theme==='highrated'&&!ratingsAvailable)throw new AppError('高評価検索には評価情報が必要です。「すべて」などに切り替えてください。',429);
+    if((input.theme==='highrated'||input.theme==='reviews')&&!ratingsAvailable)throw new AppError('この検索には評価情報が必要です。「すべて」などに切り替えてください。',429);
     const result=await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]')));
     return json({...result,destinations:result.destinations.map(d=>({...d,ratingsAvailable})),ratingsAvailable});
   } catch (error) {

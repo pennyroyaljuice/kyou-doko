@@ -39,7 +39,7 @@ export class GoogleProvider implements DiscoveryProvider {
     const groups:Place[][]=[];
     const areas=explorationAreas(origin,input);
     // Two concurrent requests; four total, without unbounded expansion or retries.
-    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,input.theme==='highrated'?'POPULARITY':'DISTANCE',this.includeRatings))));
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,(input.theme==='highrated'||input.theme==='reviews')?'POPULARITY':'DISTANCE',this.includeRatings))));
     return explorationCandidates(groups,origin,input,80);
   }
   async fallback(origin:Point,input:SearchInput):Promise<Place[]> {
