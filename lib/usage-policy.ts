@@ -1,11 +1,16 @@
 export type UsageKind='search'|'photo'|'map';
-export const usagePolicy={plan:'free',userDaily:5,searchDaily:20,searchRolling:200,photoRolling:500,mapRolling:1000,windowDays:32} as const;
-export type UsageDay={search:number;photo:number;map:number;users:Record<string,number>};
-export type UsageState={days:Record<string,UsageDay>};
+export const usagePolicy={plan:'free',userDaily:10,searchDaily:40,searchRolling:400,photoRolling:500,mapRolling:1000,windowDays:32} as const;
+export type UsageDay={search:number;photo:number;map:number;users:Record<string,number>;admin?:{search:number;photo:number;map:number}};
+export type UsageState={days:Record<string,UsageDay>;adminSubjects?:string[]};
 export function usageDate(now:number){return new Date(now+9*3600000).toISOString().slice(0,10);}
 export function decideUsage(state:UsageState,subject:string,kind:UsageKind,now:number,reserve:boolean,unlimited=false){
  const today=usageDate(now),cutoff=usageDate(now-(usagePolicy.windowDays-1)*86400000);
  for(const day of Object.keys(state.days))if(day<cutoff)delete state.days[day];
+ // Existing search counts can be identified by account; split them once on owner access.
+ if(unlimited&&!state.adminSubjects?.includes(subject)){
+  for(const d of Object.values(state.days)){const previous=d.users[subject]??0;d.admin??={search:0,photo:0,map:0};d.admin.search+=previous;d.search=Math.max(0,d.search-previous);delete d.users[subject];}
+  (state.adminSubjects??=[]).push(subject);
+ }
  const day=state.days[today]??{search:0,photo:0,map:0,users:{}};
  const totals=Object.values(state.days).reduce((a,d)=>({search:a.search+d.search,photo:a.photo+d.photo,map:a.map+d.map}),{search:0,photo:0,map:0});
  let reason='';
@@ -15,6 +20,7 @@ export function decideUsage(state:UsageState,subject:string,kind:UsageKind,now:n
  else if(kind==='photo'&&totals.photo>=usagePolicy.photoRolling)reason='写真の利用上限に達しました。';
  else if(kind==='map'&&totals.map>=usagePolicy.mapRolling)reason='地図の利用上限に達しました。外部ナビをご利用ください。';
  }
- if(reserve&&!reason){day[kind]++;if(kind==='search')day.users[subject]=(day.users[subject]??0)+1;state.days[today]=day;totals[kind]++;}
- return {unlimited,allowed:!reason,reason,date:today,resetAt:new Date(Date.parse(today+'T00:00:00+09:00')+86400000).toISOString(),remaining:unlimited?null:Math.max(0,usagePolicy.userDaily-(day.users[subject]??0)),dailySearches:day.search,rolling:totals,limits:usagePolicy};
+ if(reserve&&!reason){if(unlimited){day.admin??={search:0,photo:0,map:0};day.admin[kind]++;}else{day[kind]++;if(kind==='search')day.users[subject]=(day.users[subject]??0)+1;totals[kind]++;}state.days[today]=day;}
+ const adminRolling=Object.values(state.days).reduce((a,d)=>({search:a.search+(d.admin?.search??0),photo:a.photo+(d.admin?.photo??0),map:a.map+(d.admin?.map??0)}),{search:0,photo:0,map:0});
+ return {unlimited,allowed:!reason,reason,date:today,resetAt:new Date(Date.parse(today+'T00:00:00+09:00')+86400000).toISOString(),remaining:unlimited?null:Math.max(0,usagePolicy.userDaily-(day.users[subject]??0)),dailySearches:day.search,dailyAdminSearches:day.admin?.search??0,adminRolling,rolling:totals,limits:usagePolicy};
 }
