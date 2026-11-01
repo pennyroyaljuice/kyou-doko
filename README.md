@@ -184,3 +184,5 @@ Nearby Searchは最大4回のまま各20件を取得し、重複・範囲外・�
 公式仕様：https://developers.google.com/maps/documentation/urls/get-started https://map.yahoo.co.jp/blog/archives/20150202_carnavischeme.html
 
 Yahoo側は利用者の希望により従来のYahoo!カーナビ経路起動へ戻しました。車の検索結果で、現在地から目的地、検索出発地からの往路、復路の指定を提供します。Google Mapsは施設ID付きの場所の詳細リンクを維持します。直前のYahoo!マップ施設検索への変更は画面では取り消しています。
+
+移動時間/距離の初期入力値は共通120。単位切替では数値を書き換えず維持し、距離ボタンには道のアイコンを表示します。各候補カードの選択ボタン外にサービス名とアイコン付きの直接リンクを配置。Google Mapsは施設ID付きの場所表示、車の結果ではYahoo!カーナビの現在地から目的地への経路起動も可能です。直接リンクはカード選択や検索APIの呼出しを必要としません。
