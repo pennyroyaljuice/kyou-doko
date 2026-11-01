@@ -42,4 +42,8 @@ export function totals(place: Place, outbound: Leg, inbound?: Leg): Destination 
   return {...place, outbound, inbound, seconds:outbound.seconds+(inbound?.seconds??0), meters:outbound.meters+(inbound?.meters??0)};
 }
 
-export function sortDestinations(items:Destination[],input:SearchInput,sort:'budget'|'rating'=input.sort??'budget'){const ranked=rank(items,input);return sort==='rating'?ranked.sort((a,b)=>(b.rating??-1)-(a.rating??-1)||(b.userRatingCount??0)-(a.userRatingCount??0)):ranked;}
+export function sortDestinations(items:Destination[],input:SearchInput,sort:'budget'|'rating'=input.sort??'budget'){
+ // Eligibility is decided once by the search. Display sorting must preserve every result.
+ const value=(d:Destination)=>input.metric==='time'?d.seconds:d.meters;
+ return [...items].sort((a,b)=>sort==='rating'?(b.rating??-1)-(a.rating??-1)||(b.userRatingCount??0)-(a.userRatingCount??0)||value(b)-value(a):value(b)-value(a));
+}

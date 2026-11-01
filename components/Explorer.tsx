@@ -1,6 +1,6 @@
 'use client';
 import ResetKey from './ResetKey';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Waves, X } from 'lucide-react';
 import {sortDestinations,type Mode,type Point,type SearchInput,type SearchResult } from '@/lib/domain';
 import { themeLabels, type DestinationTheme } from '@/lib/themes';
@@ -19,6 +19,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const [origin,setOrigin]=useState(''),[gps,setGps]=useState<Point|null>(null);
   const [gpsAccuracy,setGpsAccuracy]=useState<number|null>(null);
   const [mode,setMode]=useState<Mode>('DRIVE'),[metric,setMetric]=useState<'time'|'distance'>('time'),[budget,setBudget]=useState('120'),[roundTrip,setRoundTrip]=useState(true);
+  const listRef=useRef<HTMLDivElement>(null);
   const [resultSort,setResultSort]=useState<'budget'|'rating'>('budget');
   const [theme,setTheme]=useState<DestinationTheme>('all');
   const [avoidHighways,setAvoidHighways]=useState(false);
@@ -85,10 +86,10 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
-        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<label className="sort-control">並び順<select value={resultSort} onChange={e=>setResultSort(e.target.value as 'budget'|'rating')}><option value="budget">条件に近い順</option><option value="rating" disabled={!result.ratingsAvailable}>Google評価順</option></select></label>}{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
+        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<label className="sort-control">並び順<select value={resultSort} onChange={e=>{setResultSort(e.target.value as 'budget'|'rating');if(listRef.current)listRef.current.scrollTop=0;}}><option value="budget">条件に近い順</option><option value="rating" disabled={!result.ratingsAvailable}>Google評価順</option></select></label>}{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
         {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name}{result.input.mode==='DRIVE'&&<> / {result.input.avoidHighways?'高速回避':'高速利用可'}</>} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.budget}{result.input.metric==='time'?'分':'km'}以内 <span>·</span>{themeLabels[result.input.theme??'all']}</div>}
         <div className={`results-grid view-${view}`}>
-          <div className="destination-list">
+          <div className="destination-list" ref={listRef}>
             {!result?<div className="empty-state"><h3>{busy?'検索中…':'検索結果はここに表示されます'}</h3><p>{busy?'経路と移動時間を確認しています。':'条件を指定して「調べる」を押してください。'}</p></div>:result.destinations.length===0?<div className="empty-state"><Compass size={35}/><h3>条件内の候補が見つかりませんでした</h3><p>時間・距離を広げるか、目的地の種類・移動手段を変更してください。<br/>未対応の地域・交通手段では結果が出ない場合があります。</p></div>:displayed.map((d,i)=><DestinationCard key={d.id} destination={d} showRating={result.ratingsAvailable===true} index={i} selected={selectedId===d.id} onSelect={onSelect} roundTrip={result.input.roundTrip} estimated={result.source==='google'&&result.input.mode==='BICYCLE'} preference={prefs?.places[d.id]} preferenceDisabled={prefSaving||!prefs} onPreference={signedIn&&result.source==='google'?(kind)=>void savePreference({id:d.id,kind:prefs?.places[d.id]===kind?'remove':kind}):undefined}/>) }
           </div>
           <div className="map-and-detail"><div className="map-container"><MapView result={result} selected={selected} onSelect={onSelect}/><div className="map-top-label"><MapPin size={13}/>{result?'Google Maps':'目的地の位置'}</div></div>
