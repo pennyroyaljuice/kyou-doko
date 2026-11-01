@@ -6,6 +6,7 @@ import type { DiscoveryProvider } from './providers';
 type GooglePlace = { rating?:number; userRatingCount?:number; types?: string[]; primaryType?: string; photos?: {name:string;authorAttributions?:{displayName:string;uri?:string}[]}[]; id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
 const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.types,places.primaryType,places.attributions,places.photos';
 export class GoogleProvider implements DiscoveryProvider {
+  private innerCandidates:Place[]|undefined;
   constructor(private key: string,private includeRatings=false) {}
   private async request<T>(url: string, body: unknown, mask: string): Promise<T> {
     let response: Response;
@@ -37,12 +38,14 @@ export class GoogleProvider implements DiscoveryProvider {
   }
   async discover(origin:Point,input:SearchInput):Promise<Place[]> {
     const groups:Place[][]=[];
-    const areas=explorationAreas(origin,input);
-    // Two concurrent requests; four total, without unbounded expansion or retries.
-    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,(input.theme==='highrated'||input.theme==='reviews')?'POPULARITY':'DISTANCE',this.includeRatings))));
-    return explorationCandidates(groups,origin,input,80);
+    const areas=[...explorationAreas(origin,input),{center:origin,radius:Math.max(100,Math.min(50000,radius(input)*0.45))}];
+    // Four overlapping outer tiles plus an origin-centred inner circle; at most five calls.
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,(i===4||input.theme==='highrated'||input.theme==='reviews')?'POPULARITY':'DISTANCE',this.includeRatings))));
+    this.innerCandidates=groups[4]??[];
+    return explorationCandidates(groups,origin,input,100);
   }
   async fallback(origin:Point,input:SearchInput):Promise<Place[]> {
+    if(this.innerCandidates!==undefined)return this.innerCandidates;
     return this.nearby(origin,Math.min(50000,radius(input)),input.theme,'POPULARITY',this.includeRatings);
   }
   private async photo(place:GooglePlace) {

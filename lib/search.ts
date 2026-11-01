@@ -1,3 +1,4 @@
+import {directionSector,geographicOrder,explorationFraction} from './exploration';
 import {highlyRated} from './themes';
 import {estimateBicycleLeg,bicycleSpeedKmh} from './bicycle-estimate';
 import { AppError, distance, radius, rank, sortDestinations, totals, type SearchInput, type SearchResult, type Destination } from './domain';
@@ -8,9 +9,9 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const origin = await provider.resolve(input.origin);
   const discovered = (provider.discover ? await provider.discover(origin.point,input) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
-  let places=discovered.filter(p=>!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)).slice(0,80);
+  let places=discovered.filter(p=>!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)).slice(0,100);
   const ratingPriority=(a:typeof places[number],b:typeof places[number])=>input.theme==='reviews'?(b.userRatingCount??0)-(a.userRatingCount??0)||(b.rating??0)-(a.rating??0):input.theme==='highrated'?(b.rating??0)-(a.rating??0)||(b.userRatingCount??0)-(a.userRatingCount??0):0;
-  if(input.theme==='highrated'||input.theme==='reviews')places.sort(ratingPriority);
+
   let unavailable = 0;
   const items:Destination[] = [];
   const start = new Date();
@@ -20,26 +21,29 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   let routeCalls=0;const routeLimit=24;
   let fallbackUsed=false,failed=0;
   const estimates:number[]=[];
+  const attempts:number[]=Array(9).fill(0);
   async function refill(){
     if(fallbackUsed||!provider.fallback)return;fallbackUsed=true;
     let extra:Awaited<ReturnType<NonNullable<typeof provider.fallback>>>;
     try{extra=await provider.fallback(origin.point,input);}catch{return;}
     const seen=new Set(places.map(p=>p.id));
-    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&distance(origin.point,p.point)<=radius(input)){seen.add(p.id);places.push(p);}
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=radius(input)){seen.add(p.id);places.push(p);}
   }
   for (let i=0;items.length<8&&routeCalls<routeLimit;i+=2) {
     if(items.length<8&&((i>=2&&failed>=2)||i>=places.length)){
       await refill();
-      if(failed>=2){
-        const measured=[...estimates].sort((a,b)=>a-b);
-        const factor=measured.length?measured[Math.floor(measured.length/2)]:1;
-        const target=input.budget*0.85;
-        places=[...places.slice(0,i),...places.slice(i).sort((a,b)=>ratingPriority(a,b)||Math.abs(distance(origin.point,a.point)*factor-target)-Math.abs(distance(origin.point,b.point)*factor-target))];
-      }
     }
-    if(input.theme==='highrated')places=[...places.slice(0,i),...places.slice(i).sort(ratingPriority)];
+    const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
+    const target=factor?input.budget*0.85:radius(input)*explorationFraction(input);
+    const score=(p:typeof places[number])=>Math.abs(distance(origin.point,p.point)*(factor??1)-target);
+    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||distance(origin.point,p.point)*factor<=input.budget;
+    // Defer predicted over-budget candidates, but still check them if needed; never fabricate or reject a route on this estimate alone.
+    const preferred=pending.filter(withinEstimate),reserve=pending.filter(p=>!withinEstimate(p));
+    const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts);
+    places=[...places.slice(0,i),...order(preferred),...order(reserve)];
     if(i>=places.length)break;
     const batch = await Promise.all(places.slice(i,i+2).map(async p=>{
+      attempts[directionSector(origin.point,p.point)]++;
       if (input.metric === 'distance' && distance(origin.point,p.point)*(input.roundTrip?2:1)>input.budget*1000) return null;
       if(routeCalls>=routeLimit)return null;routeCalls++;
       const outbound = await getLeg(origin.point,p.point,start);
@@ -58,8 +62,8 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     }));
     items.push(...batch.filter((p):p is Destination=>p!==null));
   }
-  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の最大5か所で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
-  if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。追加の自動検索は行いません。`);
+  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の内側から外側までの最大5範囲で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
+  if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。既出・除外済みの場所は経路確認の対象から外します。`);
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
