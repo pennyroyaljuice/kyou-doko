@@ -18,3 +18,9 @@ export function getCurrentLocation(geolocation: Pick<Geolocation, 'getCurrentPos
     }, { timeout: 15000, maximumAge: 0, enableHighAccuracy: true });
   });
 }
+
+export async function resolveSearchOrigin(origin:string|Point,geolocation:Pick<Geolocation,'getCurrentPosition'>|undefined,secure:boolean):Promise<{origin:string|Point;location?:CurrentLocation}>{
+ if(typeof origin!=='string')return {origin};
+ if(origin.trim())return {origin:origin.trim()};
+ const location=await getCurrentLocation(geolocation,secure);return {origin:location.point,location};
+}

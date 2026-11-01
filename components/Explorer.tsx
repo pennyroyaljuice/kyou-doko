@@ -11,7 +11,7 @@ import MapView from './MapView';
 import DestinationCard from './DestinationCard';
 import PlaceLinks from './PlaceLinks';
 import YahooNavigation from './YahooNavigation';
-import { getCurrentLocation } from '@/lib/location';
+import { getCurrentLocation,resolveSearchOrigin } from '@/lib/location';
 const modes = [{id:'DRIVE',name:'車',icon:Car},{id:'BICYCLE',name:'自転車',icon:Bike},{id:'WALK',name:'徒歩',icon:Footprints}] as const;
 const minutes=(s:number)=>`${Math.ceil(s/60)}分`;
 const km=(m:number)=>`${(m/1000).toFixed(1)} km`;
@@ -50,21 +50,25 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     finally {setLocating(false);}
   }
   async function submit(append=false) {
-    if(busy)return;
+    if(busy||locating)return;
     const previous=append?result:null;
     if(append&&!previous)return;
     if(source==='google'&&!liveAccess){setError('検索にはGoogleログインが必要です。');return;}
     if(source==='google'&&!liveAvailable){setError('通常検索の設定が必要です。設定手順を確認してください。');return;}
     setBusy(true);setAdding(append);setError('');setAdditionalMessage('');if(!append)setResult(null);
-    const input:SearchInput=previous?{...previous.input,origin:previous.origin,seenPlaceIds:previous.destinations.map(d=>d.id),explorationPage:(previous.input.explorationPage??0)+1}:{theme,source,origin:gps??origin,mode,metric,budget:Number(budget),...(minBudget.trim()?{minBudget:Number(minBudget)}:{}),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
     try {
+      if(!previous&&!gps&&!origin.trim())setLocating(true);
+      const prepared=previous?null:await resolveSearchOrigin(gps??origin,navigator.geolocation,window.isSecureContext);
+      if(prepared?.location){const location=prepared.location;setGps(location.point);setGpsAccuracy(location.accuracy);setOrigin(location.point.lat.toFixed(5)+', '+location.point.lng.toFixed(5));}
+      setLocating(false);
+      const input:SearchInput=previous?{...previous.input,origin:previous.origin,seenPlaceIds:previous.destinations.map(d=>d.id),explorationPage:(previous.input.explorationPage??0)+1}:{theme,source,origin:prepared!.origin,mode,metric,budget:Number(budget),...(minBudget.trim()?{minBudget:Number(minBudget)}:{}),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
       const response=await fetch(isOwner?'/admin/api/search':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
       const data=await response.json() as SearchResult & {error?:string};
       if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
       if(previous){const merged=mergeResults(previous,data);const added=merged.destinations.length-previous.destinations.length;setResult(merged);setSelectedId(current=>current||merged.destinations[0]?.id||'');setAdditionalMessage(added?added+'件追加しました。':'条件内の新しい候補は見つかりませんでした。');}
       else{setResult(data);setResultSort(data.input.theme==='reviews'?'reviews':data.input.theme==='highrated'?'rating':'budget');setSelectedId(data.destinations[0]?.id??'');}
     } catch(e) {setError(e instanceof Error&&e.name!=='TimeoutError'?e.message:'検索がタイムアウトしました。時間をあけて再試行してください。');}
-    finally {setBusy(false);setAdding(false);void refreshUsage();}
+    finally {setBusy(false);setLocating(false);setAdding(false);void refreshUsage();}
   }
   function shuffle() {
     if(!result||result.destinations.length<2)return;
@@ -77,10 +81,10 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       <section className="search-panel" aria-labelledby="search-heading">
         <div className="panel-top"><h1 id="search-heading"><SlidersHorizontal size={17}/>検索条件</h1></div>
         <form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={busy||locating}><div className="conditions">
-          <div className="condition origin-condition"><label htmlFor="origin"><span className="step">01</span>出発地点</label><div className="input-box"><MapPin size={18}/><input id="origin" value={origin} placeholder="駅名・住所・緯度,経度" onChange={e=>{reset();setGps(null);setGpsAccuracy(null);setOrigin(e.target.value);}} required maxLength={200}/><button type="button" className="gps" onClick={()=>void locate()} disabled={!liveAccess} aria-label="現在地を取得" title={liveAccess?'位置情報を許可して現在地を取得':'Googleログインが必要です'}><LocateFixed size={18}/><span>現在地</span></button></div><small>{locating?'現在地を取得しています…':gps?'現在地を取得済み'+(gpsAccuracy!==null&&Number.isFinite(gpsAccuracy)?'（精度目安 ±'+Math.ceil(gpsAccuracy)+'m）':''):'位置情報が使えない場合は手入力できます'}</small></div>
+          <div className="condition origin-condition"><label htmlFor="origin"><span className="step">01</span>出発地点</label><div className="input-box"><MapPin size={18}/><input id="origin" value={origin} placeholder="駅名・住所（空欄なら現在地）" onChange={e=>{reset();setGps(null);setGpsAccuracy(null);setOrigin(e.target.value);}} maxLength={200}/><button type="button" className="gps" onClick={()=>void locate()} disabled={!liveAccess} aria-label="現在地を取得" title={liveAccess?'位置情報を許可して現在地を取得':'Googleログインが必要です'}><LocateFixed size={18}/><span>現在地</span></button></div><small>{locating?'現在地を取得しています…':gps?'現在地を取得済み'+(gpsAccuracy!==null&&Number.isFinite(gpsAccuracy)?'（精度目安 ±'+Math.ceil(gpsAccuracy)+'m）':''):'位置情報が使えない場合は手入力できます'}</small></div>
           <div className="condition"><label><span className="step">02</span>移動手段</label><div className="transport">{modes.map(m=><button key={m.id} type="button" aria-pressed={mode===m.id} onClick={()=>{reset();setMode(m.id);}}><m.icon size={23}/><span>{m.name}</span></button>)}</div>{mode==='DRIVE'&&<div className="highway-option"><label htmlFor="use-highways"><input id="use-highways" type="checkbox" checked={!avoidHighways} onChange={e=>{reset();setAvoidHighways(!e.target.checked);}}/>高速道路を利用する</label></div>}</div>
           <div className="condition budget-condition"><div className="budget-heading"><label htmlFor="budget"><span className="step">03</span>移動時間・距離</label><div className="budget-toggles"><button className="condition-toggle" type="button" aria-label={metric==='time'?'移動条件：時間。距離に切り替える':'移動条件：距離。時間に切り替える'} title={metric==='time'?'距離に切り替える':'時間に切り替える'} onClick={()=>{reset();setMetric(metric==='time'?'distance':'time');}}>{metric==='time'?<Clock3 size={16}/>:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3 3 21M16 3l5 18M12 3v3m0 4v4m0 4v3"/></svg>}<span>{metric==='time'?'時間':'距離'}</span></button><button className="condition-toggle" type="button" aria-label={roundTrip?'移動区分：往復。片道に切り替える':'移動区分：片道。往復に切り替える'} title={roundTrip?'片道に切り替える':'往復に切り替える'} onClick={()=>{reset();setRoundTrip(!roundTrip);}}>{roundTrip?<ArrowLeftRight size={16}/>:<ArrowRight size={16}/>}<span>{roundTrip?'往復':'片道'}</span></button></div></div><div className="budget-range"><div className="range-input range-lower"><input id="min-budget" aria-label={metric==='time'?'移動時間の下限（分・任意）':'移動距離の下限（km・任意）'} type="number" min="0" max={budget||undefined} step="any" value={minBudget} placeholder="下限（目安）" onChange={e=>{reset();setMinBudget(e.target.value);}}/><span>{metric==='time'?'分':'km'}</span></div><span className="range-separator" aria-hidden="true">〜</span><div className="range-input range-upper"><input id="budget" aria-label={metric==='time'?'移動時間の上限（分）':'移動距離の上限（km）'} type="number" min={Math.max(metric==='time'?5:1,Number(minBudget)||0)} max={metric==='time'?480:300} step="any" value={budget} placeholder="上限" onChange={e=>{reset();setBudget(e.target.value);}} required/><span>{metric==='time'?'分':'km'}</span></div></div></div>
-        </div><div className="search-actions"><div className="destination-preference"><label><span className="step">04</span>目的地の種類</label><div className="theme-switch" role="group" aria-label="目的地の種類">{(Object.keys(themeLabels) as DestinationTheme[]).map(t=><button key={t} type="button" aria-pressed={theme===t} onClick={()=>{reset();setTheme(t);}}>{themeLabels[t]}</button>)}</div><small>{theme==='reviews'?'レビュー件数が多い場所を優先':theme==='highrated'?'星4.0以上・口コミ10件以上':theme==='nature'?'山・海・渓谷・公園など':theme==='tourism'?'名所・テーマパーク・文化施設・寺社など':'種類を絞らずに探します'}</small></div><div className="search-bottom"><button className="search-button" type="submit" disabled={source==='google'&&(!liveAvailable||searchBlocked)} aria-describedby={searchBlocked?'search-blocked-reason':undefined}>{busy?<><RefreshCw size={19} className="spin"/>探しています…</>:searchBlocked?<>検索上限に達しました</>:<>調べる <ArrowRight size={19}/></>}</button></div></div></fieldset></form>
+        </div><div className="search-actions"><div className="destination-preference"><label><span className="step">04</span>目的地の種類</label><div className="theme-switch" role="group" aria-label="目的地の種類">{(Object.keys(themeLabels) as DestinationTheme[]).map(t=><button key={t} type="button" aria-pressed={theme===t} onClick={()=>{reset();setTheme(t);}}>{themeLabels[t]}</button>)}</div><small>{theme==='reviews'?'レビュー件数が多い場所を優先':theme==='highrated'?'星4.0以上・口コミ10件以上':theme==='nature'?'山・海・渓谷・公園など':theme==='tourism'?'名所・テーマパーク・文化施設・寺社など':'種類を絞らずに探します'}</small></div><div className="search-bottom"><button className="search-button" type="submit" disabled={source==='google'&&(!liveAvailable||searchBlocked)} aria-describedby={searchBlocked?'search-blocked-reason':undefined}>{busy?<><RefreshCw size={19} className="spin"/>{locating?'現在地を取得中…':'探しています…'}</>:searchBlocked?<>検索上限に達しました</>:<>調べる <ArrowRight size={19}/></>}</button></div></div></fieldset></form>
       </section>
       {searchBlocked&&<div id="search-blocked-reason" className="setup-banner" role="status"><span>{blockedReason}</span></div>}
       {publicEnabled&&!signedIn&&<div className="setup-banner"><span>Googleログインで1日5回まで検索できます（日本時間0時更新）。</span><a href="/login">Googleでログイン</a></div>}

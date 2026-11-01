@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getCurrentLocation } from '../lib/location';
+import { getCurrentLocation,resolveSearchOrigin } from '../lib/location';
 import { googleConfig } from '../lib/runtime-config';
 describe('現在地', () => {
   it('クリックに応じた一回取得で座標と精度を返す', async () => {
@@ -30,4 +30,10 @@ describe('公開キーのランタイム読み取り',()=>{
       if(browser===undefined)delete process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;else process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=browser;
     }
   });
+});
+
+describe('空欄検索の現在地取得',()=>{
+ it.each(['','   '])('出発地が空欄なら現在地を一度取得して検索起点へ渡す',async origin=>{const getCurrentPosition=vi.fn((ok:PositionCallback)=>ok({coords:{latitude:35.5,longitude:139.5,accuracy:12}} as GeolocationPosition));const prepared=await resolveSearchOrigin(origin,{getCurrentPosition},true);expect(prepared.origin).toEqual({lat:35.5,lng:139.5});expect(prepared.location?.accuracy).toBe(12);expect(getCurrentPosition).toHaveBeenCalledTimes(1);});
+ it('手入力や取得済み座標があれば現在地を取り直さない',async()=>{const geo={getCurrentPosition:vi.fn()};expect(await resolveSearchOrigin(' 東京駅 ',geo,false)).toEqual({origin:'東京駅'});expect(await resolveSearchOrigin({lat:35,lng:139},geo,true)).toEqual({origin:{lat:35,lng:139}});expect(geo.getCurrentPosition).not.toHaveBeenCalled();});
+ it('位置情報が拒否されたら検索用の起点を返さず手入力を案内する',async()=>{const geo={getCurrentPosition:(_ok:PositionCallback,error?:PositionErrorCallback|null)=>error?.({code:1} as GeolocationPositionError)};await expect(resolveSearchOrigin('',geo,true)).rejects.toThrow('手入力');});
 });
