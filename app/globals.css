@@ -119,4 +119,6 @@
 .range-input input::placeholder{font-size:12px;color:#8e998f}.range-input>span{font-size:11px;color:#7e897a;white-space:nowrap}.range-separator{font-size:15px;color:#7e897a}
 @media(max-width:600px){.budget-heading{gap:7px}.budget-heading label{font-size:10px;gap:5px}.budget-toggles{gap:5px}.budget-toggles .condition-toggle{min-width:58px;min-height:44px;padding:7px 5px;font-size:11px;gap:4px}.budget-range{gap:8px}.range-input input{font-size:28px}.range-input input::placeholder{font-size:10px}}
 
-.range-upper input{font-weight:600}
+.range-input input{font-family:inherit;font-weight:600}
+
+.below-minimum-tag{display:inline-block;align-self:flex-start;font-size:10px;color:#7a715b;background:#f5f1e6;border-radius:4px;padding:1px 5px;margin:3px 0}

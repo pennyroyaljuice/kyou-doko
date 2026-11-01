@@ -13,7 +13,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const ratingPriority=(a:typeof places[number],b:typeof places[number])=>input.theme==='reviews'?(b.userRatingCount??0)-(a.userRatingCount??0)||(b.rating??0)-(a.rating??0):input.theme==='highrated'?(b.rating??0)-(a.rating??0)||(b.userRatingCount??0)-(a.userRatingCount??0):0;
 
   let unavailable = 0;
-  const items:Destination[] = [];
+  const items:Destination[] = [],belowMinimum:Destination[]=[];
   const start = new Date();
   const routeMode=input.mode==='BICYCLE'?'WALK':input.mode;
   const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
@@ -60,14 +60,15 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
       if(direct>100)estimates.push(actualValue/direct);
       if(!rank([result],input).length){failed++;return null;}return result;
     }));
-    items.push(...batch.filter((p):p is Destination=>p!==null));
+    for(const item of batch){if(!item)continue;const value=input.metric==='time'?item.seconds/60:item.meters/1000;if(value<(input.minBudget??0))belowMinimum.push(item);else items.push(item);}
   }
   const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の内側から外側までの最大5範囲で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
   if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。既出・除外済みの場所は経路確認の対象から外します。`);
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
-  const ranked=(input.theme==='reviews'?sortDestinations(items,input,'reviews'):input.theme==='highrated'?sortDestinations(items,input,'rating'):rank(items,input)).slice(0,8);
+  const order=(pool:Destination[])=>input.theme==='reviews'?sortDestinations(pool,input,'reviews'):input.theme==='highrated'?sortDestinations(pool,input,'rating'):rank(pool,input);
+  const ranked=[...order(items),...order(belowMinimum)].slice(0,8);
   if(input.mode==='BICYCLE')notices.push(`自転車は推定値です。徒歩経路の距離を平均時速${bicycleSpeedKmh}kmで換算しています。階段・歩行者専用道など、自転車で通行できない道を含む可能性があります。実際の自転車経路・距離・時間は外部Google Mapsで確認してください。`);
   if(!ranked.length&&items.length)notices.push('取得できた経路はすべて指定した時間・距離の上限を超えました。往復は帰りの分も含みます。');
   if(ranked.length && (input.metric==='time'?ranked[0].seconds/60:ranked[0].meters/1000)<input.budget*0.75) notices.push('今回の候補は指定上限より短い移動に偏っています。道路網や候補分類・探索範囲の制限により、上限に近い候補を取得できない場合があります。');

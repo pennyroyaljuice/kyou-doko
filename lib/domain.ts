@@ -34,7 +34,7 @@ export function distance(a: Point, b: Point) {
 }
 export function rank(items: Destination[], input: SearchInput) {
   const value = (d: Destination) => input.metric === 'time' ? d.seconds / 60 : d.meters / 1000;
-  return items.filter(d => value(d) >= (input.minBudget??0) && value(d) <= input.budget).sort((a,b) => value(b)-value(a));
+  return items.filter(d => value(d) <= input.budget).sort((a,b) => value(b)-value(a));
 }
 export function radius(input: SearchInput) {
   const speed = {DRIVE:50,TRANSIT:60,BICYCLE:15,WALK:4}[input.mode];
