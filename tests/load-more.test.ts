@@ -1,0 +1,13 @@
+import {it,expect,vi} from 'vitest';
+import {parseInput,type SearchInput,type SearchResult,type Destination} from '../lib/domain';
+import {mergeResults} from '../lib/merge-results';
+import {explorationAreas} from '../lib/exploration';
+import {search} from '../lib/search';
+const point={lat:35.6812,lng:139.7671};const input:SearchInput={source:'google',origin:point,mode:'DRIVE',metric:'time',budget:120,roundTrip:true};
+const make=(id:string):Destination=>({id,name:id,point,category:'公園',description:'',seconds:100,meters:100,outbound:{seconds:50,meters:50},inbound:{seconds:50,meters:50}});
+const result=(ids:string[],page=0,ratingsAvailable=true):SearchResult=>({source:'google',origin:point,originLabel:'東京駅',input:{...input,explorationPage:page},destinations:ids.map(make),notices:[],ratingsAvailable});
+it('8件に新たな8件をマージし元の情報と検索起点を保持',()=>{const old=result(Array.from({length:8},(_,i)=>String(i))),next=result(Array.from({length:8},(_,i)=>String(i+8)),1);const merged=mergeResults(old,next);expect(merged.destinations).toHaveLength(16);expect(merged.destinations.slice(0,8)).toEqual(old.destinations);expect(merged.originLabel).toBe('東京駅');expect(merged.input.explorationPage).toBe(1);expect(old.destinations).toHaveLength(8);});
+it('重複を除き0件でも既存候補を残して次ページへ進む',()=>{const old=result(['a','b']);expect(mergeResults(old,result(['a','c','c'],1)).destinations.map(d=>d.id)).toEqual(['a','b','c']);const merged=mergeResults(old,result([],2,false));expect(merged.destinations).toEqual(old.destinations);expect(merged.input.explorationPage).toBe(2);expect(merged.ratingsAvailable).toBe(true);});
+it('既出IDとアカウント除外を経路確認前に適用する',async()=>{const route=vi.fn(async()=>({seconds:50,meters:50}));const found=await search({...input,seenPlaceIds:['old'],explorationPage:1},{resolve:async()=>({point,label:'東京駅'}),nearby:async()=>[make('old'),make('excluded'),make('new')],route},new Set(['excluded']));expect(found.destinations.map(d=>d.id)).toEqual(['new']);expect(route).toHaveBeenCalledTimes(2);});
+it('追加時は探索位置を変え通常検索は従来の探索位置を使う',()=>{const normal=explorationAreas(point,input),extra=explorationAreas(point,{...input,explorationPage:1});expect(normal).toEqual(explorationAreas(point,{...input,explorationPage:0}));expect(extra[0].center).not.toEqual(normal[0].center);expect(extra.every(a=>a.radius<=50000)).toBe(true);});
+it('追加検索の入力を検証し既出IDの重複を除く',()=>{expect(parseInput({...input,seenPlaceIds:['a','a'],explorationPage:1}).seenPlaceIds).toEqual(['a']);for(const bad of [{seenPlaceIds:['a',null]},{seenPlaceIds:Array(501).fill('a')},{explorationPage:-1},{explorationPage:1.5}])expect(()=>parseInput({...input,...bad})).toThrow();});

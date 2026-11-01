@@ -13,9 +13,9 @@ export async function POST(request:Request) {
   try {
     const origin = request.headers.get('origin');
     if (origin && new URL(origin).host !== request.headers.get('host')) throw new AppError('このサイトの画面から検索してください。',403);
-    if (Number(request.headers.get('content-length')??0)>4096) throw new AppError('入力が長すぎます。',413);
+    if (Number(request.headers.get('content-length')??0)>140000) throw new AppError('入力が長すぎます。',413);
     const raw = await request.text();
-    if (raw.length > 4096) throw new AppError('入力が長すぎます。',413);
+    if (raw.length > 140000) throw new AppError('入力が長すぎます。',413);
     let body:unknown;
     try { body=JSON.parse(raw); } catch { throw new AppError('入力形式が正しくありません。'); }
     const input = parseInput(body);
@@ -32,7 +32,8 @@ export async function POST(request:Request) {
     if(!access.isOwner){active=true; locked=true; last=Date.now(); count++;}
     const ratingsAvailable=request.headers.get('x-kyou-ratings-approved')==='true';
     if(input.theme==='highrated'&&!ratingsAvailable)throw new AppError('高評価検索には評価情報が必要です。「すべて」などに切り替えてください。',429);
-    return json({...await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]'))),ratingsAvailable});
+    const result=await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]')));
+    return json({...result,destinations:result.destinations.map(d=>({...d,ratingsAvailable})),ratingsAvailable});
   } catch (error) {
     return json({error:error instanceof AppError?error.message:'検索に失敗しました。時間をおいてお試しください。'},error instanceof AppError?error.status:500);
   } finally { if (locked) active=false; }

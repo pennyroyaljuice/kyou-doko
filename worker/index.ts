@@ -60,8 +60,8 @@ export default {
   if((path==='/api/search'||path==='/admin/api/search')&&request.method==='POST'){
    if(!sameOrigin(request))return Response.json({error:'このサイトの画面から検索してください。'},{status:403});
    try{
-    if(Number(request.headers.get('Content-Length')??0)>4096)return new Response(null,{status:413});
-    const raw=await request.clone().text();if(raw.length>4096)return new Response(null,{status:413});
+    if(Number(request.headers.get('Content-Length')??0)>140000)return new Response(null,{status:413});
+    const raw=await request.clone().text();if(raw.length>140000)return new Response(null,{status:413});
     const input=parseInput(JSON.parse(raw));
     if(input.source!=='google')return Response.json({error:'デモ検索は終了しました。Googleログイン後に検索してください。'},{status:410});
     if(input.source==='google'){

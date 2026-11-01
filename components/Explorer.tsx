@@ -1,5 +1,6 @@
 'use client';
 import ResetKey from './ResetKey';
+import {mergeResults} from '@/lib/merge-results';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ArrowRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Waves, X } from 'lucide-react';
 import {sortDestinations,type Mode,type Point,type SearchInput,type SearchResult } from '@/lib/domain';
@@ -23,6 +24,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const [resultSort,setResultSort]=useState<'budget'|'rating'>('budget');
   const [theme,setTheme]=useState<DestinationTheme>('all');
   const [avoidHighways,setAvoidHighways]=useState(false);
+  const [adding,setAdding]=useState(false),[additionalMessage,setAdditionalMessage]=useState('');
   const [result,setResult]=useState<SearchResult|null>(null),[selectedId,setSelectedId]=useState(''),[view,setView]=useState<'list'|'map'>('list'),[busy,setBusy]=useState(false),[locating,setLocating]=useState(false),[error,setError]=useState('');
   const [usage,setUsage]=useState<{remaining:number|null;resetAt:string;allowed?:boolean;reason?:string;rolling?:{search:number;photo:number;map:number};dailySearches?:number;dailyAdminSearches?:number;adminRolling?:{search:number;photo:number;map:number}}|null>(null);
   const refreshUsage=useCallback(async()=>{if(!signedIn)return;try{const response=await fetch('/api/usage');if(response.ok)setUsage(await response.json());}catch{}},[signedIn]);
@@ -34,7 +36,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const displayed=result?sortDestinations(result.destinations,result.input,resultSort):[];
   const selected=result?.destinations.find(d=>d.id===selectedId);
   const onSelect=useCallback((id:string)=>setSelectedId(id),[]);
-  const reset=()=>{setResult(null);setSelectedId('');setError('');};
+  const reset=()=>{setResult(null);setSelectedId('');setError('');setAdditionalMessage('');};
   async function locate() {
     if(!liveAccess)return;
     reset();setLocating(true);
@@ -47,18 +49,22 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     } catch(e) {setError(e instanceof Error?e.message:'現在地を取得できませんでした。出発地点を手入力してください。');}
     finally {setLocating(false);}
   }
-  async function submit() {
+  async function submit(append=false) {
+    if(busy)return;
+    const previous=append?result:null;
+    if(append&&!previous)return;
     if(source==='google'&&!liveAccess){setError('検索にはGoogleログインが必要です。');return;}
     if(source==='google'&&!liveAvailable){setError('通常検索の設定が必要です。設定手順を確認してください。');return;}
-    setBusy(true);setError('');setResult(null);
-    const input:SearchInput={theme,source,origin:gps??origin,mode,metric,budget:Number(budget),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
+    setBusy(true);setAdding(append);setError('');setAdditionalMessage('');if(!append)setResult(null);
+    const input:SearchInput=previous?{...previous.input,origin:previous.origin,seenPlaceIds:previous.destinations.map(d=>d.id),explorationPage:(previous.input.explorationPage??0)+1}:{theme,source,origin:gps??origin,mode,metric,budget:Number(budget),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
     try {
       const response=await fetch(isOwner?'/admin/api/search':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
       const data=await response.json() as SearchResult & {error?:string};
       if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
-      setResult(data);setResultSort(data.input.theme==='highrated'?'rating':'budget');setSelectedId(data.destinations[0]?.id??'');
+      if(previous){const merged=mergeResults(previous,data);const added=merged.destinations.length-previous.destinations.length;setResult(merged);setSelectedId(current=>current||merged.destinations[0]?.id||'');setAdditionalMessage(added?added+'件追加しました。':'条件内の新しい候補は見つかりませんでした。');}
+      else{setResult(data);setResultSort(data.input.theme==='highrated'?'rating':'budget');setSelectedId(data.destinations[0]?.id??'');}
     } catch(e) {setError(e instanceof Error&&e.name!=='TimeoutError'?e.message:'検索がタイムアウトしました。時間をあけて再試行してください。');}
-    finally {setBusy(false);void refreshUsage();}
+    finally {setBusy(false);setAdding(false);void refreshUsage();}
   }
   function shuffle() {
     if(!result||result.destinations.length<2)return;
@@ -92,13 +98,14 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
         {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name}{result.input.mode==='DRIVE'&&<> / {result.input.avoidHighways?'高速回避':'高速利用可'}</>} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.budget}{result.input.metric==='time'?'分':'km'}以内 <span>·</span>{themeLabels[result.input.theme??'all']}</div>}
         <div className={`results-grid view-${view}`}>
           <div className="destination-list" ref={listRef}>
-            {!result?<div className="empty-state"><h3>{busy?'検索中…':'検索結果はここに表示されます'}</h3><p>{busy?'経路と移動時間を確認しています。':'条件を指定して「調べる」を押してください。'}</p></div>:result.destinations.length===0?<div className="empty-state"><Compass size={35}/><h3>条件内の候補が見つかりませんでした</h3><p>時間・距離を広げるか、目的地の種類・移動手段を変更してください。<br/>未対応の地域・交通手段では結果が出ない場合があります。</p></div>:displayed.map((d,i)=><DestinationCard key={d.id} destination={d} showRating={result.ratingsAvailable===true} index={i} selected={selectedId===d.id} onSelect={onSelect} roundTrip={result.input.roundTrip} estimated={result.source==='google'&&result.input.mode==='BICYCLE'} preference={prefs?.places[d.id]} preferenceDisabled={prefSaving||!prefs} onPreference={signedIn&&result.source==='google'?(kind)=>void savePreference({id:d.id,kind:prefs?.places[d.id]===kind?'remove':kind}):undefined}/>) }
+            {!result?<div className="empty-state"><h3>{busy?'検索中…':'検索結果はここに表示されます'}</h3><p>{busy?'経路と移動時間を確認しています。':'条件を指定して「調べる」を押してください。'}</p></div>:result.destinations.length===0?<div className="empty-state"><Compass size={35}/><h3>条件内の候補が見つかりませんでした</h3><p>時間・距離を広げるか、目的地の種類・移動手段を変更してください。<br/>未対応の地域・交通手段では結果が出ない場合があります。</p></div>:displayed.map((d,i)=><DestinationCard key={d.id} destination={d} showRating={d.ratingsAvailable??result.ratingsAvailable===true} index={i} selected={selectedId===d.id} onSelect={onSelect} roundTrip={result.input.roundTrip} estimated={result.source==='google'&&result.input.mode==='BICYCLE'} preference={prefs?.places[d.id]} preferenceDisabled={prefSaving||!prefs} onPreference={signedIn&&result.source==='google'?(kind)=>void savePreference({id:d.id,kind:prefs?.places[d.id]===kind?'remove':kind}):undefined}/>) }
           </div>
           <div className="map-and-detail"><div className="map-container"><MapView result={result} selected={selected} onSelect={onSelect}/><div className="map-top-label"><MapPin size={13}/>{result?'Google Maps':'目的地の位置'}</div></div>
             {selected&&result?<div className="route-detail"><div className="detail-heading"><div><span className="spot-category">{result.input.mode==='BICYCLE'?'自転車の推定値 · 徒歩経路ベース':'移動の目安'}</span><h3>{selected.name}</h3></div><Navigation size={22}/></div><div className="route-stats"><div><Clock3 size={17}/><strong>{minutes(selected.seconds)}</strong><small>{result.input.roundTrip?'往復合計':'片道'}</small></div><div><Route size={17}/><strong>{km(selected.meters)}</strong></div></div>{selected.inbound&&<p className="leg-summary">往路 {minutes(selected.outbound.seconds)} / {km(selected.outbound.meters)} <ArrowRight size={12}/> 復路 {minutes(selected.inbound.seconds)} / {km(selected.inbound.meters)}</p>}<a className="nav-link" href={googleMapsUrl(result.origin,selected.point,result.input.mode,[],result.input.avoidHighways)} target="_blank" rel="noopener noreferrer">Google Mapsで往路を開く <ArrowUpRight size={17}/></a><div className="secondary-nav">{selected.inbound&&<a href={googleMapsUrl(selected.point,result.origin,result.input.mode,[],result.input.avoidHighways)} target="_blank" rel="noopener noreferrer">Google Mapsで復路 ↗</a>}</div><p className="nav-note">外部ナビではルート・所要時間が再計算されます。{result.input.mode==='DRIVE'&&'高速道路の設定は外部ナビでも確認してください。'}</p>{result.input.mode==='DRIVE'&&<YahooNavigation origin={result.origin} originLabel={result.originLabel} destination={selected.point} name={selected.name} roundTrip={result.input.roundTrip} avoidHighways={result.input.avoidHighways} demo={false}/>} {selected.attributions?.map(a=><p key={a.name} className="attribution"><a href={/^https?:/.test(a.uri)?a.uri:undefined} target="_blank" rel="noopener noreferrer">{a.name}</a></p>)}</div>:<div className="map-placeholder-note"><p>候補を選ぶと移動時間・距離と外部ナビを表示します。</p></div>}
           </div>
         </div>
-        {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}<button className="text-button" onClick={()=>void submit()} disabled={busy}>同じ条件で再検索（実APIでは新たに利用量が発生） <RefreshCw size={13}/></button></div>}
+        {result&&<div className="load-more"><button className="load-more-button" onClick={()=>void submit(true)} disabled={busy||searchBlocked||result.destinations.length>=500}>{adding?<><RefreshCw size={16} className="spin"/>追加で探しています…</>:<>さらに調べる <RefreshCw size={16}/></>}</button><small>{result.destinations.length>=500?'表示上限に達しました。条件を指定して新しく検索してください。':'追加検索も1回分を使用します'}</small>{additionalMessage&&<p role="status">{additionalMessage}</p>}</div>}
+        {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}</div>}
       </section>
     </main><footer><span className="footer-brand">ココからドコへ？</span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} ココからドコへ？</span></div></footer>
   </>;

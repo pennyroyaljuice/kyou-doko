@@ -1,9 +1,11 @@
 import {distance,radius,type Point,type SearchInput,type Place} from './domain';
 // Offset searches prevent a city's most popular central attractions taking every slot.
 export function explorationAreas(origin:Point,input:SearchInput) {
+ const page=input.explorationPage??0,rotation=page*Math.PI*(3-Math.sqrt(5));
  const reach=radius(input),lat=origin.lat*Math.PI/180,lng=origin.lng*Math.PI/180;
- return [0,Math.PI/2,Math.PI,Math.PI*1.5].map((bearing,index)=>{
- const fraction=input.mode==='DRIVE'?0.78:index%2===0?0.6:0.3;
+ return [0,Math.PI/2,Math.PI,Math.PI*1.5].map((baseBearing,index)=>{
+ const bearing=baseBearing+rotation;
+ const fraction=(input.mode==='DRIVE'?0.78:index%2===0?0.6:0.3)*(page%3===1?0.85:page%3===2?0.95:1);
  const angular=reach*fraction/6371000;
  const phi=Math.asin(Math.sin(lat)*Math.cos(angular)+Math.cos(lat)*Math.sin(angular)*Math.cos(bearing));
  const lambda=lng+Math.atan2(Math.sin(bearing)*Math.sin(angular)*Math.cos(lat),Math.cos(angular)-Math.sin(lat)*Math.sin(phi));

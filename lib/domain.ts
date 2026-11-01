@@ -1,8 +1,8 @@
 import type { DestinationTheme } from './themes';
 export type Point = { lat: number; lng: number };
 export type Mode = 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK';
-export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean; theme?: DestinationTheme; sort?: 'budget'|'rating' };
-export type Place = { rating?:number; userRatingCount?:number; id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
+export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; mode: Mode; metric: 'time' | 'distance'; budget: number; roundTrip: boolean; avoidHighways?: boolean; theme?: DestinationTheme; sort?: 'budget'|'rating'; seenPlaceIds?:string[]; explorationPage?:number };
+export type Place = { ratingsAvailable?:boolean; rating?:number; userRatingCount?:number; id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
 export type SearchResult = { ratingsAvailable?:boolean; source: 'demo' | 'google'; origin: Point; originLabel: string; input: SearchInput; destinations: Destination[]; notices: string[] };
@@ -23,7 +23,9 @@ export function parseInput(v: unknown): SearchInput {
   if (x.avoidHighways !== undefined && typeof x.avoidHighways !== 'boolean') throw new AppError('高速道路の設定が正しくありません。');
   if (x.theme !== undefined && !['all','tourism','nature','highrated'].includes(x.theme)) throw new AppError('目的地の種類が正しくありません。');
   if(x.sort!==undefined&&!['budget','rating'].includes(x.sort))throw new AppError('並び順が正しくありません。');
-  return { sort:x.sort??'budget', theme:x.theme ?? 'all', avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
+  if(x.seenPlaceIds!==undefined&&(!Array.isArray(x.seenPlaceIds)||x.seenPlaceIds.length>500||x.seenPlaceIds.some(id=>typeof id!=='string'||id.length<1||id.length>256)))throw new AppError('追加検索の候補情報が正しくありません。');
+  if(x.explorationPage!==undefined&&(!Number.isInteger(x.explorationPage)||x.explorationPage<0||x.explorationPage>1000))throw new AppError('追加検索の情報が正しくありません。');
+  return { ...(x.seenPlaceIds?{seenPlaceIds:[...new Set(x.seenPlaceIds)]}:{}),...(x.explorationPage!==undefined?{explorationPage:x.explorationPage}:{}),sort:x.sort??'budget', theme:x.theme ?? 'all', avoidHighways:x.mode === 'DRIVE' && x.avoidHighways === true, source:x.source, origin:typeof x.origin === 'string' ? x.origin.trim() : {lat:x.origin.lat,lng:x.origin.lng}, mode:x.mode, metric:x.metric, budget:x.budget, roundTrip:x.roundTrip };
 }
 export function distance(a: Point, b: Point) {
   const r = Math.PI / 180, dlat = (b.lat-a.lat)*r, dlng = (b.lng-a.lng)*r;

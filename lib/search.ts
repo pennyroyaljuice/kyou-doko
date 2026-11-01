@@ -4,6 +4,7 @@ import { AppError, distance, radius, rank, sortDestinations, totals, type Search
 import type { DiscoveryProvider } from './providers';
 export async function search(input:SearchInput, provider:DiscoveryProvider, excluded:ReadonlySet<string>=new Set()):Promise<SearchResult> {
   if (input.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
+  excluded=new Set([...excluded,...(input.seenPlaceIds??[])]);
   const origin = await provider.resolve(input.origin);
   const discovered = (provider.discover ? await provider.discover(origin.point,input) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
