@@ -70,7 +70,7 @@ export default {
      if(env.LIVE_SEARCH_ENABLED!=='true')return Response.json({error:'検索は現在停止中です。'},{status:503});
      const store=await preferenceStore(env,identity!.sub);const prefsResponse=await store.fetch('https://usage.internal/preferences');if(!prefsResponse.ok)throw Error('Preferences unavailable');
      headers.set('x-kyou-excluded-places',JSON.stringify(excludedIds(await prefsResponse.json() as Preferences)));
-     const usage=await checkUsage(env,identity!.sub,'search',true,identity!.isOwner);
+     const usage=await checkUsage(env,identity!.sub,'search',true,identity!.isOwner,input.sort==='rating');
      if(!usage.allowed)return Response.json({error:usage.reason,remaining:usage.remaining,resetAt:usage.resetAt},{status:429,headers:{'Cache-Control':'no-store'}});
      headers.set('x-kyou-budget-approved','true');
     }

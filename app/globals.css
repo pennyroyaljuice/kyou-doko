@@ -52,3 +52,5 @@
 .admin-usage{padding:14px 16px;margin:12px 0;border:1px solid #dce5de;border-radius:8px;background:white;font-size:12px;line-height:1.8}.admin-usage summary{cursor:pointer;font-weight:600}.admin-usage label{display:block;margin:12px 0}.admin-usage select{display:block;width:100%;max-width:540px;padding:9px;border:1px solid #bccdbf;border-radius:6px;background:white;color:inherit;font:inherit}.admin-usage button{margin:10px 8px 0 0;padding:8px 12px;border:1px solid #a5b9ab;border-radius:6px;background:#f5f8f4;color:inherit}.reset-confirm{margin-top:12px;padding:12px;border:1px solid #e3d4b7;border-radius:6px;background:#fff9ef}
 
 .admin-usage input{display:block;width:100%;max-width:540px;margin:6px 0 10px;padding:10px;border:1px solid var(--line,#d7ded8);border-radius:8px;box-sizing:border-box}
+
+.sort-control{display:flex;align-items:center;gap:8px;font-size:12px}.sort-control select{max-width:170px;padding:8px;border:1px solid #d7ded8;border-radius:8px;background:white;color:inherit}.search-bottom{flex-wrap:wrap;gap:12px}.spot-rating{display:block;font-size:12px;color:#7a5917;margin:3px 0}
