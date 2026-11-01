@@ -30,7 +30,8 @@ export async function POST(request:Request) {
     if (Date.now()-started > 3600000) { started=Date.now(); count=0; }
     if (!access.isOwner && (active || Date.now()-last < 10000 || count>=30)) throw new AppError('検索回数を制限しています。10秒以上あけて再試行してください（1時間30回まで）。',429);
     if(!access.isOwner){active=true; locked=true; last=Date.now(); count++;}
-    return json(await search(input,new GoogleProvider(key),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]'))));
+    const ratingsAvailable=request.headers.get('x-kyou-ratings-approved')==='true';
+    return json({...await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]'))),ratingsAvailable});
   } catch (error) {
     return json({error:error instanceof AppError?error.message:'検索に失敗しました。時間をおいてお試しください。'},error instanceof AppError?error.status:500);
   } finally { if (locked) active=false; }

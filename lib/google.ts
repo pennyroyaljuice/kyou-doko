@@ -6,7 +6,7 @@ import type { DiscoveryProvider } from './providers';
 type GooglePlace = { rating?:number; userRatingCount?:number; types?: string[]; primaryType?: string; photos?: {name:string;authorAttributions?:{displayName:string;uri?:string}[]}[]; id: string; displayName?: {text:string}; formattedAddress?: string; location?: {latitude:number;longitude:number}; primaryTypeDisplayName?: {text:string}; attributions?: {provider:string;providerUri:string}[] };
 const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.types,places.primaryType,places.attributions,places.photos';
 export class GoogleProvider implements DiscoveryProvider {
-  constructor(private key: string) {}
+  constructor(private key: string,private includeRatings=false) {}
   private async request<T>(url: string, body: unknown, mask: string): Promise<T> {
     let response: Response;
     try {
@@ -39,7 +39,7 @@ export class GoogleProvider implements DiscoveryProvider {
     const groups:Place[][]=[];
     const areas=explorationAreas(origin,input);
     // Two concurrent requests; four total, without unbounded expansion or retries.
-    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE',input.sort==='rating'))));
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE',this.includeRatings))));
     return explorationCandidates(groups,origin,input,80);
   }
   private async photo(place:GooglePlace) {

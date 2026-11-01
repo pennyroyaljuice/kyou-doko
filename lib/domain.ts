@@ -5,7 +5,7 @@ export type SearchInput = { source: 'demo' | 'google'; origin: string | Point; m
 export type Place = { rating?:number; userRatingCount?:number; id: string; name: string; description: string; category: string; point: Point; photo?: { ticket: string; authors: { name: string; uri?: string }[] }; attributions?: { name: string; uri: string }[] };
 export type Leg = { seconds: number; meters: number; polyline?: string };
 export type Destination = Place & { outbound: Leg; inbound?: Leg; seconds: number; meters: number };
-export type SearchResult = { source: 'demo' | 'google'; origin: Point; originLabel: string; input: SearchInput; destinations: Destination[]; notices: string[] };
+export type SearchResult = { ratingsAvailable?:boolean; source: 'demo' | 'google'; origin: Point; originLabel: string; input: SearchInput; destinations: Destination[]; notices: string[] };
 export class AppError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export function isPoint(v: unknown): v is Point {
   if (!v || typeof v !== 'object') return false;
