@@ -98,3 +98,10 @@
 .card-map-links .card-google-link{color:#286b4c}.card-map-links .card-yahoo-link{color:#b52338}.card-map-links a:hover{background:#f0f5ed}
 .card-footer .card-preferences{margin-left:auto;padding:4px 0;font-size:11px;gap:12px}
 @media(max-width:560px){.card-map-links{gap:5px}.card-map-links a{font-size:10px;padding:6px 8px}.card-footer{gap:3px 8px}}
+
+/* One card surface contains its selection area, map links, and preferences. */
+.destination-shell{border:1px solid #e1e6d9;border-radius:9px;background:#fff;transition:border-color .2s,box-shadow .2s}
+.destination-shell:hover{border-color:#9caf96}.destination-shell.selected{border-color:#669375;box-shadow:0 2px 8px #2b5d4210}
+.destination-shell>.destination-card,.destination-shell>.destination-card.selected{border:0;border-radius:8px 8px 0 0;box-shadow:none;background:transparent}
+.destination-shell .card-footer{margin:0 14px;padding:8px 0 12px;border-top:1px solid #edf1eb}
+@media(max-width:560px){.destination-shell .card-footer{margin:0 12px;padding:8px 0 10px}}
