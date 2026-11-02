@@ -1,5 +1,6 @@
 'use client';
 import ResetKey from './ResetKey';
+import {SearchAuditPanel} from './SearchAuditPanel';
 import OriginInput from './OriginInput';
 import type {OriginSelection} from '@/lib/origin-places';
 import {mergeResults} from '@/lib/merge-results';
@@ -112,6 +113,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
           </div>
         </div>
 
+        {isOwner&&result?.auditHistory&&<SearchAuditPanel history={result.auditHistory}/>}
         {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}</div>}
       </section>
     </main><footer><span className="footer-brand">ココからドコへ？</span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} ココからドコへ？</span></div></footer>

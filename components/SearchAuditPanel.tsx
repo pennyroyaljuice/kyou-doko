@@ -1,0 +1,5 @@
+import type {SearchAudit} from '../lib/search-audit';
+const labels=['北','北東','東','南東','南','南西','西','北西','起点付近'];
+export function SearchAuditPanel({history}:{history:SearchAudit[]}){
+ return <details className="search-audit"><summary>探索履歴（管理者）</summary><p>この検索と追加検索の直近10回。画面を離れると消えます。探索は中心点の方位を示し、方位全体の網羅を意味しません。</p>{history.map((audit,index)=><div key={index}><h3>検索 {index+1} · 経路 {audit.routeCalls} / {audit.routeLimit}回（方向確認 {audit.calibrationCalls}回を含む）· 候補探索 {audit.discoveryAreas}範囲{audit.discoveryFailures>0&&<> · 探索失敗 {audit.discoveryFailures}回</>}</h3><div className="audit-scroll"><table><thead><tr>{['方位','探索','候補','経路','経路なし','上限超過','範囲内','下限未満','採用','枠待ち'].map(s=><th key={s}>{s}</th>)}</tr></thead><tbody>{audit.sectors.map(s=><tr key={s.sector}><th>{labels[s.sector]}</th><td>{s.queries}</td><td>{s.discovered}</td><td>{s.routeCalls}</td><td>{s.unavailable}</td><td>{s.overUpper}</td><td>{s.withinRange}</td><td>{s.belowMinimum}</td><td>{s.selected}</td><td>{s.budgetDeferred}</td></tr>)}</tbody></table></div></div>)}</details>;
+}

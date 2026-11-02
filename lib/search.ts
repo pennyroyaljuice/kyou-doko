@@ -2,7 +2,9 @@ import {directionSector,geographicOrder,explorationAreas,explorationFraction,poi
 import {estimateBicycleLeg,bicycleSpeedKmh} from './bicycle-estimate';
 import { AppError, distance, radius, rank, totals, type SearchInput, type SearchResult, type Destination } from './domain';
 import type { DiscoveryProvider } from './providers';
-export async function search(input:SearchInput, provider:DiscoveryProvider, excluded:ReadonlySet<string>=new Set()):Promise<SearchResult> {
+import {DirectionalRouteBudget} from './route-budget';
+import {newSearchAudit,type SearchAudit} from './search-audit';
+export async function search(input:SearchInput, provider:DiscoveryProvider, excluded:ReadonlySet<string>=new Set(),onAudit?:(audit:SearchAudit)=>void):Promise<SearchResult> {
   if (input.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
   excluded=new Set([...excluded,...(input.seenPlaceIds??[])]);
   const origin = await provider.resolve(input.origin);
@@ -10,14 +12,17 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const start = new Date();
   const routeMode=input.mode==='BICYCLE'?'WALK':input.mode;
   const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
-  let routeCalls=0;const routeLimit=24;
+  const budget=new DirectionalRouteBudget(24,input.roundTrip?2:1),audit=newSearchAudit();const routeLimit=24;
+  const estimates:number[]=[];
+  const observations:{point:typeof origin.point;cost:number;direct:number}[]=[];
   // Measure each direction itself, rather than project a road speed measured
   // across a different bay or mountain range. These probes share the same cap.
   const calibrate=async(center:typeof origin.point)=>{
-    if(routeCalls>=routeLimit)return center;
-    routeCalls++;
+    const trace=audit.sectors[directionSector(origin.point,center)];trace.queries++;
+    if(!budget.probe())return center;
+    audit.calibrationCalls++;trace.calibrationCalls++;
     const leg=await getLeg(origin.point,center,start);
-    if(!leg)return pointAlongBearing(origin.point,center,distance(origin.point,center)*0.55);
+    if(!leg){trace.calibrationUnavailable++;return pointAlongBearing(origin.point,center,distance(origin.point,center)*0.55);}
     const value=(input.metric==='time'?leg.seconds/60:leg.meters/1000)*(input.roundTrip?2:1);
     if(value<=0)return center;
     const reach=Math.min(1000000,radius(input)*(input.mode==='DRIVE'&&input.metric==='time'?(input.avoidHighways?1.4:2):1));
@@ -26,6 +31,8 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const discovered = (provider.discover ? await provider.discover(origin.point,input,provider.radialDiscovery?calibrate:undefined) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
   let places=discovered.filter(p=>!excluded.has(p.id)).slice(0,100);
+  const auditDiscovered=(pool:typeof places)=>{for(const p of pool)audit.sectors[directionSector(origin.point,p.point)].discovered++;};
+  auditDiscovered(places);audit.discoveryAreas=provider.radialDiscovery?2:1;
   const ratingPriority=(a:typeof places[number],b:typeof places[number])=>input.theme==='reviews'?(b.userRatingCount??0)-(a.userRatingCount??0)||(b.rating??0)-(a.rating??0):input.theme==='highrated'?(b.rating??0)-(a.rating??0)||(b.userRatingCount??0)-(a.userRatingCount??0):0;
 
   let unavailable = 0;
@@ -33,8 +40,6 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   // Reserve a bounded route budget; retain discovery reserves for rejected candidates.
   let refinements=0,failed=0;
   const refinementLimit=Math.min(3,Math.max(0,provider.refinementLimit??1));
-  const estimates:number[]=[];
-  const observations:{point:typeof origin.point;cost:number;direct:number}[]=[];
   let refinedIds=new Set<string>();
   let refinedCenter:typeof origin.point|undefined;
   const emptyRefinementSectors=new Set<number>();
@@ -62,20 +67,22 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     const targetFraction=provider.radialDiscovery?0.95:0.98;
     const desired=best?(usableSlope?best.direct+(input.budget*targetFraction-best.cost)/slope:best.direct*input.budget*targetFraction/best.cost):0;
     const area=crossDirection?{center:await calibrate(crossDirection),radius:Math.max(100,Math.min(50000,reach*0.75))}:best?{center:pointAlongBearing(origin.point,best.point,Math.max(100,Math.min(refinementReach*0.98,desired))),radius:Math.max(100,Math.min(50000,reach*0.15))}:undefined;
-    try{extra=await provider.fallback(origin.point,input,area);}catch{return;}
+    audit.discoveryAreas++;
+    if(area&&!crossDirection)audit.sectors[directionSector(origin.point,area.center)].queries++;
+    try{extra=await provider.fallback(origin.point,input,area);}catch{audit.discoveryFailures++;return;}
     const seen=new Set(places.map(p=>p.id));refinedIds=new Set();refinedCenter=area?.center;
-    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);}
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);auditDiscovered([p]);}
     if(!refinedIds.size&&area)emptyRefinementSectors.add(directionSector(origin.point,area.center));
   }
-  for (let i=0;routeCalls<routeLimit;i+=2) {
+  for (let i=0;budget.used<routeLimit;i++) {
     if((i>=4&&i<=8)||i>=places.length){
       await refill();
     }
     const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
-    const accepted=items.length+belowMinimum.length,remaining=routeLimit-routeCalls;
+    const accepted=items.length+belowMinimum.length,remaining=routeLimit-budget.used;
     const fillFirst=failed>=2&&accepted<8&&remaining<=(8-accepted)*(input.roundTrip?2:1)+4;
-    // Preserve enough of the route budget to fill the list after repeated over-budget routes.
-    const target=factor?input.budget*(fillFirst?0.75:1):radius(input)*explorationFraction(input);
+    // Relax the planning lower bound when filling, but keep the upper target.
+    const target=factor?input.budget:radius(input)*explorationFraction(input);
     const predictedValues=new Map<string,number>();
     const predicted=(p:typeof places[number])=>{
       const cached=predictedValues.get(p.id);if(cached!==undefined)return cached;
@@ -91,29 +98,39 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     const improvementPool=items.length+belowMinimum.length>=8;
     const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>score(a)-score(b)||ratingPriority(a,b),items,attempts,quality);
     const ordered=improvementPool?order(pending):[...order(preferred),...order(reserve)];
-    // Measure two newly discovered places before spending the next refinement.
-    const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,2),probeIds=new Set(probes.map(p=>p.id));
-    places=[...places.slice(0,i),...probes,...ordered.filter(p=>!probeIds.has(p.id))];
-    refinedIds.clear();
-    if(i>=places.length){if(provider.fallback&&refinements<refinementLimit){i-=2;continue;}break;}
-    const batch = await Promise.all(places.slice(i,i+2).map(async p=>{
-      attempts[directionSector(origin.point,p.point)]++;
+    // Keep a local refinement probe while respecting untested-direction reserves.
+    const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,1),probeIds=new Set(probes.map(p=>p.id));
+    const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>score(a)-score(b),[],[],quality);
+    const firstBySector=untested.filter((p,index)=>untested.findIndex(other=>directionSector(origin.point,other.point)===directionSector(origin.point,p.point))===index),firstIds=new Set(firstBySector.map(p=>p.id));
+    places=[...places.slice(0,i),...firstBySector,...probes.filter(p=>!firstIds.has(p.id)),...ordered.filter(p=>!probeIds.has(p.id)&&!firstIds.has(p.id))];
+    // Reserved directions may postpone a refinement probe; retain it until tried.
+    for(const p of places.slice(i,i+1))refinedIds.delete(p.id);
+    if(i>=places.length){if(provider.fallback&&refinements<refinementLimit){i--;continue;}break;}
+    const batch = await Promise.all(places.slice(i,i+1).map(async p=>{
+      const sector=directionSector(origin.point,p.point),trace=audit.sectors[sector];
       if (input.metric === 'distance' && distance(origin.point,p.point)*(input.roundTrip?2:1)>input.budget*1000) return null;
-      if(routeCalls>=routeLimit)return null;routeCalls++;
-      const outbound = await getLeg(origin.point,p.point,start);
-      if (!outbound) { failed++;unavailable++; return null; }
+      const pendingSectors=places.slice(i).filter(p=>input.metric!=='distance'||distance(origin.point,p.point)*(input.roundTrip?2:1)<=input.budget*1000).map(p=>directionSector(origin.point,p.point));
+      const futureProbes=provider.radialDiscovery?Math.max(0,Math.min(2,refinementLimit)-refinements):0;
+      const permit=budget.reserve(sector,pendingSectors,futureProbes);
+      if(!permit){trace.budgetDeferred++;return null;}
+      attempts[sector]++;trace.attempted++;
+      const candidateLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{permit.leg();trace.routeCalls++;return getLeg(from,to,departure);};
+      try{
+      const outbound = await candidateLeg(origin.point,p.point,start);
+      if (!outbound) { failed++;unavailable++;trace.unavailable++; return null; }
       const outboundValue=input.metric==='time'?outbound.seconds/60:outbound.meters/1000;
       const direct=distance(origin.point,p.point);
-      if(outboundValue>input.budget){observations.push({point:p.point,cost:outboundValue*(input.roundTrip?2:1),direct});if(direct>100)estimates.push(outboundValue*(input.roundTrip?2:1)/direct);failed++;return null;}
-      if(input.roundTrip&&routeCalls>=routeLimit)return null;
-      if(input.roundTrip)routeCalls++;
-      const inbound = input.roundTrip ? await getLeg(p.point,origin.point,new Date(start.getTime()+outbound.seconds*1000)) : undefined;
-      if (input.roundTrip && !inbound) { failed++;unavailable++; return null; }
+      if(outboundValue>input.budget){observations.push({point:p.point,cost:outboundValue*(input.roundTrip?2:1),direct});if(direct>100)estimates.push(outboundValue*(input.roundTrip?2:1)/direct);failed++;trace.overUpper++;return null;}
+      const inbound = input.roundTrip ? await candidateLeg(p.point,origin.point,new Date(start.getTime()+outbound.seconds*1000)) : undefined;
+      if (input.roundTrip && !inbound) { failed++;unavailable++;trace.unavailable++; return null; }
       const result=totals(p,outbound,inbound??undefined);
       const actualValue=input.metric==='time'?result.seconds/60:result.meters/1000;
       observations.push({point:p.point,cost:actualValue,direct});
       if(direct>100)estimates.push(actualValue/direct);
-      if(!rank([result],input).length){failed++;return null;}return result;
+      if(!rank([result],input).length){failed++;trace.overUpper++;return null;}
+      if(actualValue<(input.minBudget??0))trace.belowMinimum++;else trace.withinRange++;
+      return result;
+      }finally{permit.close();}
     }));
     for(const item of batch){if(!item)continue;const value=input.metric==='time'?item.seconds/60:item.meters/1000;if(value<(input.minBudget??0))belowMinimum.push(item);else items.push(item);}
   }
@@ -127,6 +144,8 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)));
   const selected=choose(items).slice(0,8);
   const ranked=[...order(selected),...order(choose(belowMinimum).slice(0,8-selected.length))];
+  for(const p of ranked)audit.sectors[directionSector(origin.point,p.point)].selected++;
+  audit.routeCalls=budget.used;onAudit?.(audit);
   if(input.mode==='BICYCLE')notices.push(`自転車は推定値です。徒歩経路の距離を平均時速${bicycleSpeedKmh}kmで換算しています。階段・歩行者専用道など、自転車で通行できない道を含む可能性があります。実際の自転車経路・距離・時間は外部Google Mapsで確認してください。`);
   if(!ranked.length&&items.length)notices.push('取得できた経路はすべて指定した時間・距離の上限を超えました。往復は帰りの分も含みます。');
   if(ranked.length && (input.metric==='time'?ranked[0].seconds/60:ranked[0].meters/1000)<input.budget*0.75) notices.push('今回の候補は指定上限より短い移動に偏っています。道路網や候補分類・探索範囲の制限により、上限に近い候補を取得できない場合があります。');

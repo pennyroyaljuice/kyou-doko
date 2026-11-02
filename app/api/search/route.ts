@@ -5,6 +5,7 @@ import { GoogleProvider } from '@/lib/google';
 import { search } from '@/lib/search';
 import { googleConfig } from '@/lib/runtime-config';
 import { requestAccess, liveEnabled } from '@/lib/access';
+import type {SearchAudit} from '@/lib/search-audit';
 export const runtime = 'nodejs';
 let active = false, last = 0, started = Date.now(), count = 0;
 const json = (value:unknown,status=200)=>NextResponse.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -32,8 +33,11 @@ export async function POST(request:Request) {
     if(!access.isOwner){active=true; locked=true; last=Date.now(); count++;}
     const ratingsAvailable=request.headers.get('x-kyou-ratings-approved')==='true';
     if((input.theme==='highrated'||input.theme==='reviews')&&!ratingsAvailable)throw new AppError('この検索には評価情報が必要です。「すべて」などに切り替えてください。',429);
-    const result=await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]')));
-    return json({...result,destinations:result.destinations.map(d=>({...d,ratingsAvailable})),ratingsAvailable});
+    let audit:SearchAudit|undefined;
+    const result=await search({...input,sort:'budget'},new GoogleProvider(key,ratingsAvailable),new Set<string>(JSON.parse(request.headers.get('x-kyou-excluded-places')??'[]')),value=>{audit=value;});
+    // Aggregate counts only: never log origin, account, place IDs or API data.
+    console.info('SEARCH_AUDIT',JSON.stringify(audit));
+    return json({...result,...(access.isOwner&&audit?{auditHistory:[audit]}:{}),destinations:result.destinations.map(d=>({...d,ratingsAvailable})),ratingsAvailable});
   } catch (error) {
     return json({error:error instanceof AppError?error.message:'検索に失敗しました。時間をおいてお試しください。'},error instanceof AppError?error.status:500);
   } finally { if (locked) active=false; }
