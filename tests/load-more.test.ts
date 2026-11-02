@@ -11,3 +11,13 @@ it('重複を除き0件でも既存候補を残して次ページへ進む',()=>
 it('既出IDとアカウント除外を経路確認前に適用する',async()=>{const route=vi.fn(async()=>({seconds:50,meters:50}));const found=await search({...input,seenPlaceIds:['old'],explorationPage:1},{resolve:async()=>({point,label:'東京駅'}),nearby:async()=>[make('old'),make('excluded'),make('new')],route},new Set(['excluded']));expect(found.destinations.map(d=>d.id)).toEqual(['new']);expect(route).toHaveBeenCalledTimes(2);});
 it('追加時は探索位置を変え通常検索は従来の探索位置を使う',()=>{const normal=explorationAreas(point,input),extra=explorationAreas(point,{...input,explorationPage:1});expect(normal).toEqual(explorationAreas(point,{...input,explorationPage:0}));expect(extra[0].center).not.toEqual(normal[0].center);expect(extra.every(a=>a.radius<=50000)).toBe(true);});
 it('追加検索の入力を検証し既出IDの重複を除く',()=>{expect(parseInput({...input,seenPlaceIds:['a','a'],explorationPage:1}).seenPlaceIds).toEqual(['a']);for(const bad of [{seenPlaceIds:['a',null]},{seenPlaceIds:Array(501).fill('a')},{explorationPage:-1},{explorationPage:1.5}])expect(()=>parseInput({...input,...bad})).toThrow();});
+
+it.each(['budget','rating','reviews'] as const)('追加検索で既存の表示順・内容を保持し新規分だけ%s順で末尾へ追加',sort=>{
+ const old=result(['old-a','old-b']);old.destinations[0].seconds=30;old.destinations[1].seconds=60;
+ const next=result(['new-a','old-a','new-b'],1);next.destinations[0].seconds=500;next.destinations[0].rating=5;next.destinations[0].userRatingCount=500;next.destinations[2].seconds=600;next.destinations[2].rating=4;next.destinations[2].userRatingCount=100;
+ const merged=mergeResults(old,next,sort);
+ expect(merged.destinations.slice(0,2)).toEqual(old.destinations);
+ expect(merged.destinations.slice(2).map(d=>d.id)).toEqual(sort==='budget'?['new-b','new-a']:['new-a','new-b']);
+ expect(merged.destinations[0]).toBe(old.destinations[0]);
+ expect(mergeResults(merged,result(['new-c'],2),sort).destinations.slice(0,4)).toEqual(merged.destinations);
+});

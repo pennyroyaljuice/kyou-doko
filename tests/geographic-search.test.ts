@@ -21,3 +21,17 @@ it.each([60,180])('実測%s分から第五探索の距離を調整し二回目�
  expect(area!.radius).toBe(10000);
  expect(result.destinations.every(d=>d.seconds<=7200)).toBe(true);
 });
+
+it.each([undefined,0,90])('下限%sでも実測が短ければ初期50km圏外を補正探索し上限近くの候補を採用する',async minBudget=>{
+ const near=Array.from({length:8},(_,i)=>make('near'+i,i%8,39));
+ const far=Array.from({length:8},(_,i)=>make('far'+i,i%8,55));
+ const fallback=vi.fn(async(_origin:typeof origin,_input:SearchInput,_area?:{center:typeof origin;radius:number})=>far);
+ const route=vi.fn(async(from,to)=>{const direct=distance(origin,from===origin?to:from);return {seconds:direct/55000*3500,meters:direct*1.2};});
+ const found=await search({...input,minBudget},{resolve:async()=>({point:origin,label:'起点'}),discover:async()=>near,nearby:async()=>[],fallback,route});
+ expect(distance(origin,fallback.mock.calls[0][2]!.center)).toBeGreaterThan(50000);
+ expect(found.destinations).toHaveLength(8);
+ expect(found.destinations.filter(d=>d.id.startsWith('far')).length).toBeGreaterThanOrEqual(6);
+ expect(found.destinations[0].seconds/60).toBeGreaterThan(110);
+ expect(found.destinations.every(d=>d.seconds<=7200)).toBe(true);
+ expect(route.mock.calls.length).toBeLessThanOrEqual(24);
+});

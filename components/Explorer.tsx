@@ -33,7 +33,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const {prefs,saving:prefSaving,error:prefError,save:savePreference}=usePlacePreferences(signedIn);
   const searchBlocked=source==='google'&&!isOwner&&!!usage&&(usage.remaining===0||usage.allowed===false);
   const blockedReason=usage?.reason||(usage?.remaining===0?'本日の検索上限に達しました。日本時間の0時に更新されます。':'サービス全体の利用上限に達しました。');
-  const displayed=result?sortDestinations(result.destinations,result.input,resultSort):[];
+  const displayed=result?.destinations??[];
   const selected=result?.destinations.find(d=>d.id===selectedId);
   const onSelect=useCallback((id:string)=>setSelectedId(id),[]);
   const reset=()=>{setResult(null);setSelectedId('');setError('');setAdditionalMessage('');};
@@ -65,8 +65,8 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       const response=await fetch(isOwner?'/admin/api/search':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
       const data=await response.json() as SearchResult & {error?:string};
       if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
-      if(previous){const merged=mergeResults(previous,data);const added=merged.destinations.length-previous.destinations.length;setResult(merged);setSelectedId(current=>current||merged.destinations[0]?.id||'');setAdditionalMessage(added?added+'件追加しました。':'条件内の新しい候補は見つかりませんでした。');}
-      else{setResult(data);setResultSort(data.input.theme==='reviews'?'reviews':data.input.theme==='highrated'?'rating':'budget');setSelectedId(data.destinations[0]?.id??'');}
+      if(previous){const merged=mergeResults(previous,data,resultSort);const added=merged.destinations.length-previous.destinations.length;setResult(merged);setSelectedId(current=>current||merged.destinations[0]?.id||'');setAdditionalMessage(added?added+'件追加しました。':'条件内の新しい候補は見つかりませんでした。');}
+      else{const sort=data.input.theme==='reviews'?'reviews':data.input.theme==='highrated'?'rating':'budget';const destinations=sortDestinations(data.destinations,data.input,sort);setResult({...data,destinations});setResultSort(sort);setSelectedId(destinations[0]?.id??'');}
     } catch(e) {setError(e instanceof Error&&e.name!=='TimeoutError'?e.message:'検索がタイムアウトしました。時間をあけて再試行してください。');}
     finally {setBusy(false);setLocating(false);setAdding(false);void refreshUsage();}
   }
@@ -97,7 +97,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
-        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<label className="sort-control">並び順<select value={resultSort} onChange={e=>{setResultSort(e.target.value as 'budget'|'rating'|'reviews');if(listRef.current)listRef.current.scrollTop=0;}}><option value="budget">条件に近い順</option><option value="rating" disabled={!result.ratingsAvailable}>Google評価順</option><option value="reviews" disabled={!result.ratingsAvailable}>レビュー数順</option></select></label>}{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
+        <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<label className="sort-control">並び順<select value={resultSort} onChange={e=>{const sort=e.target.value as 'budget'|'rating'|'reviews';setResultSort(sort);setResult(current=>current?{...current,destinations:sortDestinations(current.destinations,current.input,sort)}:current);if(listRef.current)listRef.current.scrollTop=0;}}><option value="budget">条件に近い順</option><option value="rating" disabled={!result.ratingsAvailable}>Google評価順</option><option value="reviews" disabled={!result.ratingsAvailable}>レビュー数順</option></select></label>}{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
         {result&&<div className="result-summary"><MapPin size={13}/>{result.originLabel}発 <span>·</span>{modes.find(m=>m.id===result.input.mode)?.name}{result.input.mode==='DRIVE'&&<> / {result.input.avoidHighways?'高速回避':'高速利用可'}</>} <span>·</span>{result.input.roundTrip?'往復':'片道'} {result.input.minBudget!==undefined&&<>{result.input.minBudget}〜</>}{result.input.budget}{result.input.metric==='time'?'分':'km'}{result.input.minBudget===undefined?'以内':'（下限は目安）'} <span>·</span>{themeLabels[result.input.theme??'all']}</div>}
         <div className={`results-grid view-${view}`}>
           <div className="destination-list" ref={listRef}>

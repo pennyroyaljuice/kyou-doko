@@ -23,15 +23,18 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const estimates:number[]=[];
   const observations:{point:typeof origin.point;cost:number;direct:number}[]=[];
   const attempts:number[]=Array(9).fill(0);
+  // Initial circles are conservative. A measured fast road must be allowed to
+  // move the refinement beyond that estimate; actual routes still enforce the cap.
+  const refinementReach=Math.min(300000,radius(input)*(input.mode==='DRIVE'&&input.metric==='time'?(input.avoidHighways?1.4:2):1));
   async function refill(){
     if(fallbackUsed||!provider.fallback)return;fallbackUsed=true;
     let extra:Awaited<ReturnType<NonNullable<typeof provider.fallback>>>;
     const measured=observations.filter(o=>o.direct>100&&o.cost>0).sort((a,b)=>Number(a.cost>input.budget)-Number(b.cost>input.budget)||Math.abs(input.budget-a.cost)-Math.abs(input.budget-b.cost));
     const best=measured[0],reach=radius(input);
-    const area=best?{center:pointAlongBearing(origin.point,best.point,Math.min(reach*0.95,best.direct*input.budget*0.95/best.cost)),radius:Math.max(100,Math.min(50000,reach*0.2))}:undefined;
+    const area=best?{center:pointAlongBearing(origin.point,best.point,Math.min(refinementReach*0.95,best.direct*input.budget*0.95/best.cost)),radius:Math.max(100,Math.min(50000,reach*0.2))}:undefined;
     try{extra=await provider.fallback(origin.point,input,area);}catch{return;}
     const seen=new Set(places.map(p=>p.id));
-    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=radius(input)){seen.add(p.id);places.push(p);}
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);places.push(p);}
   }
   for (let i=0;routeCalls<routeLimit;i+=2) {
     if(i>=2||i>=places.length){
@@ -73,7 +76,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     }));
     for(const item of batch){if(!item)continue;const value=input.metric==='time'?item.seconds/60:item.meters/1000;if(value<(input.minBudget??0))belowMinimum.push(item);else items.push(item);}
   }
-  const notices = [`出発地から約${Math.round(radius(input)/1000)}km圏内の内側から外側までの最大5範囲で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
+  const notices = [`出発地から約${Math.round(radius(input)/1000)}kmを初期探索の目安に、実測に応じて位置を補正する最大5範囲で${input.mode==='DRIVE'?'候補':'近場も含めた候補'}を探索し、最大24回の経路計算で8件を目標に候補を確認します。探索位置は目安で、${input.mode==='BICYCLE'?'徒歩経路の距離と自転車の推定時間':'実際の経路時間・距離'}が上限以内の候補を近い順に表示します。すべての到達可能地点を網羅するものではありません。`];
   if(excludedCount)notices.push(`${excludedCount}件をアカウントの除外設定により省きました。既出・除外済みの場所は経路確認の対象から外します。`);
   if (input.theme === 'nature') notices.push('自然・景色に関するGoogleの施設分類で探索します。峠の専用分類はなく、すべての峠や山道を探せるものではありません。');
   if (input.mode === 'DRIVE' && input.avoidHighways) notices.push('高速道路をなるべく避ける条件で往路・復路を計算しています。Googleの回避指定は完全な除外を保証しません。有料道路の回避とは別の条件です。');
