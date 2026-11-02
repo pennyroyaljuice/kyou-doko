@@ -35,3 +35,12 @@ it.each([undefined,0,90])('下限%sでも実測が短ければ初期50km圏外�
  expect(found.destinations.every(d=>d.seconds<=7200)).toBe(true);
  expect(route.mock.calls.length).toBeLessThanOrEqual(24);
 });
+
+it('最初の二地点だけの遅い経路で補正先を決めず四地点の実測を比較する',async()=>{
+ const places=Array.from({length:4},(_,i)=>make('sample'+i,0,30));
+ const fallback=vi.fn(async(_origin:typeof origin,_input:SearchInput,_area?:{center:typeof origin;radius:number})=>[]);
+ const route=vi.fn(async(from,to)=>{const p=places.find(p=>p.point===to||p.point===from)!;return {seconds:Number(p.id.slice(6))<2?5400:3000,meters:40000};});
+ await search(input,{resolve:async()=>({point:origin,label:'起点'}),discover:async()=>places,nearby:async()=>[],fallback,route});
+ expect(fallback).toHaveBeenCalledTimes(1);
+ expect(distance(origin,fallback.mock.calls[0][2]!.center)).toBeCloseTo(distance(origin,places[2].point)*120*.95/100,0);
+});

@@ -37,7 +37,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);places.push(p);}
   }
   for (let i=0;routeCalls<routeLimit;i+=2) {
-    if(i>=2||i>=places.length){
+    if(i>=4||i>=places.length){
       await refill();
     }
     const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
