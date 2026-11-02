@@ -2,6 +2,7 @@ import type { DestinationTheme } from './themes';
 import type { Point, Place, Leg, Mode, SearchInput } from './domain';
 export interface DiscoveryProvider {
   readonly refinementLimit?:number;
+  readonly radialDiscovery?:boolean;
   resolve(origin: string | Point): Promise<{ point: Point; label: string }>;
   discover?(origin: Point, input: SearchInput): Promise<Place[]>;
   fallback?(origin:Point,input:SearchInput,area?:{center:Point;radius:number}):Promise<Place[]>;

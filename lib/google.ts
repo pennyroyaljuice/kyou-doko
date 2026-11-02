@@ -7,6 +7,7 @@ type GooglePlace = { rating?:number; userRatingCount?:number; types?: string[]; 
 const fields = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.types,places.primaryType,places.attributions,places.photos';
 export class GoogleProvider implements DiscoveryProvider {
   readonly refinementLimit=3;
+  readonly radialDiscovery=true;
   private refinementCalls=0;
   constructor(private key: string,private includeRatings=false) {}
   private async request<T>(url: string, body: unknown, mask: string): Promise<T> {
@@ -41,14 +42,14 @@ export class GoogleProvider implements DiscoveryProvider {
     const groups:Place[][]=[];
     const areas=explorationAreas(origin,input).filter((_,i)=>i===0||i===2);
     // Two opposite discovery tiles leave three calls for successive corrections.
-    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,(input.theme==='highrated'||input.theme==='reviews')?'POPULARITY':'DISTANCE',this.includeRatings))));
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(a=>this.nearby(a.center,a.radius,input.theme,'DISTANCE',this.includeRatings))));
 
     return explorationCandidates(groups,origin,input,100);
   }
   async fallback(origin:Point,input:SearchInput,area?:{center:Point;radius:number}):Promise<Place[]> {
     if(this.refinementCalls>=this.refinementLimit)return [];
     this.refinementCalls++;
-    return this.nearby(area?.center??origin,area?.radius??Math.min(50000,radius(input)*0.45),input.theme,area&&input.theme!=='highrated'&&input.theme!=='reviews'?'DISTANCE':'POPULARITY',this.includeRatings);
+    return this.nearby(area?.center??origin,area?.radius??Math.min(50000,radius(input)*0.45),input.theme,'DISTANCE',this.includeRatings);
   }
   private async photo(place:GooglePlace) {
     const first=place.photos?.[0],secret=this.key;
