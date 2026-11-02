@@ -1,6 +1,7 @@
 import {excludedIds,type Preferences} from '../lib/preferences';
 export { UsageBudget } from './usage';
-import {checkUsage,resetBudget,resetKeyRequest,preferenceStore,type UsageEnvironment} from './usage';
+import {checkUsage,checkOriginQuota,resetBudget,resetKeyRequest,preferenceStore,type UsageEnvironment} from './usage';
+import {originPlaces,parseOriginRequest} from '../lib/origin-places';
 import {parseInput} from '../lib/domain';
 import { servePhoto, type PhotoEnvironment } from '../lib/photos';
 import { beginGoogleLogin, finishGoogleLogin, googleAuthenticated, googleSessionIdentity, googleConfigured, clearGoogleFlow, clearGoogleSession, type GoogleAuthEnvironment } from '../lib/google-auth';
@@ -15,6 +16,17 @@ export default {
   const searchAccess=!!identity&&(identity.isOwner||env.PUBLIC_SEARCH_ENABLED==='true');
   if(searchAccess){headers.set('oai-authenticated-user-id',identity!.isOwner?'password-owner':identity!.sub);headers.set('oai-authenticated-user-email',identity!.email);}
   const usageError=()=>Response.json({error:'利用回数を確認できないため検索を停止しています。時間をおいてお試しください。'},{status:503,headers:{'Cache-Control':'no-store'}});
+  if(path==='/'&&!searchAccess&&['GET','HEAD'].includes(request.method))return redirect(env.PUBLIC_SEARCH_ENABLED==='true'?'/login':'/admin/login');
+  if(path==='/api/origin'){
+   if(request.method!=='POST')return new Response(null,{status:405});
+   if(!sameOrigin(request))return new Response(null,{status:403});
+   if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
+   if(env.LIVE_SEARCH_ENABLED!=='true'||!env.GOOGLE_MAPS_API_KEY)return Response.json({error:'入力候補は準備中です。手入力でも検索できます。'},{status:503});
+   try{if(Number(request.headers.get('Content-Length')??0)>2048)return new Response(null,{status:413});const raw=await request.text();if(raw.length>2048)return new Response(null,{status:413});const input=parseOriginRequest(JSON.parse(raw));
+    if(!(await checkOriginQuota(env,identity!.sub,identity!.isOwner)).allowed)return Response.json({error:'候補表示の利用上限に達しました。手入力でも検索できます。'},{status:429});
+    return Response.json(await originPlaces(input,env.GOOGLE_MAPS_API_KEY),{headers:{'Cache-Control':'private, no-store'}});
+   }catch(error){return Response.json({error:error instanceof Error&&'status' in error?error.message:'入力候補を取得できませんでした。手入力でも検索できます。'},{status:error instanceof SyntaxError?400:error instanceof Error&&'status' in error?Number(error.status):503,headers:{'Cache-Control':'no-store'}});}
+  }
   if(path==='/api/preferences'){
    if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});
    if(!['GET','POST'].includes(request.method))return new Response(null,{status:405});
@@ -35,7 +47,7 @@ export default {
    if(!sameOrigin(request))return new Response(null,{status:403});
    try{const raw=await request.text();if(raw.length>1024)return new Response(null,{status:413});const body=JSON.parse(raw);if(body.confirm!==true)return Response.json({error:'リセット内容を確認してください。'},{status:400});const response=await resetBudget(env,identity.sub,body.scope,body.subject);return new Response(response.body,{status:response.status,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});}catch{return Response.json({error:'リセットできませんでした。時間をおいてお試しください。'},{status:503});}
   }
-  if(path==='/login')return env.PUBLIC_SEARCH_ENABLED==='true'?authPage('',false,true,true):redirect('/admin/login');
+  if(path==='/login')return searchAccess?redirect('/'):env.PUBLIC_SEARCH_ENABLED==='true'?authPage('',false,true,true):redirect('/admin/login');
   if(path==='/logout')return redirect('/admin/logout');
   if(path==='/api/usage'||path==='/admin/api/usage'){
    if(!searchAccess)return Response.json({error:'Googleログインが必要です。'},{status:401});

@@ -1,5 +1,7 @@
 'use client';
 import ResetKey from './ResetKey';
+import OriginInput from './OriginInput';
+import type {OriginSelection} from '@/lib/origin-places';
 import {mergeResults} from '@/lib/merge-results';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ArrowRight, ArrowLeftRight, ArrowUpRight, Bike, Car, Check, Clock3, Compass, Footprints, Leaf, LocateFixed, Map, MapPin, Mountain, Navigation, RefreshCw, Route, SlidersHorizontal, Waves, X } from 'lucide-react';
@@ -18,6 +20,7 @@ const km=(m:number)=>`${(m/1000).toFixed(1)} km`;
 export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=false,publicEnabled=false}:{liveAvailable:boolean;liveAccess:boolean;signedIn:boolean;isOwner?:boolean;publicEnabled?:boolean}) {
   const source:SearchInput['source']='google';
   const [origin,setOrigin]=useState(''),[gps,setGps]=useState<Point|null>(null);
+  const [chosenOrigin,setChosenOrigin]=useState<OriginSelection|null>(null),[originResolving,setOriginResolving]=useState(false);
   const [gpsAccuracy,setGpsAccuracy]=useState<number|null>(null);
   const [mode,setMode]=useState<Mode>('DRIVE'),[metric,setMetric]=useState<'time'|'distance'>('time'),[budget,setBudget]=useState('120'),[minBudget,setMinBudget]=useState(''),[roundTrip,setRoundTrip]=useState(true);
   const listRef=useRef<HTMLDivElement>(null);
@@ -39,7 +42,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
   const reset=()=>{setResult(null);setSelectedId('');setError('');setAdditionalMessage('');};
   async function locate() {
     if(!liveAccess)return;
-    reset();setLocating(true);
+    reset();setChosenOrigin(null);setLocating(true);
     if(gps)setOrigin('');
     setGps(null);setGpsAccuracy(null);
     try {
@@ -50,7 +53,7 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     finally {setLocating(false);}
   }
   async function submit(append=false) {
-    if(busy||locating)return;
+    if(busy||locating||originResolving)return;
     const previous=append?result:null;
     if(append&&!previous)return;
     if(source==='google'&&!liveAccess){setError('検索にはGoogleログインが必要です。');return;}
@@ -58,10 +61,10 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     setBusy(true);setAdding(append);setError('');setAdditionalMessage('');if(!append)setResult(null);
     try {
       if(!previous&&!gps&&!origin.trim())setLocating(true);
-      const prepared=previous?null:await resolveSearchOrigin(gps??origin,navigator.geolocation,window.isSecureContext);
+      const prepared=previous?null:await resolveSearchOrigin(chosenOrigin?.point??gps??origin,navigator.geolocation,window.isSecureContext);
       if(prepared?.location){const location=prepared.location;setGps(location.point);setGpsAccuracy(location.accuracy);setOrigin(location.point.lat.toFixed(5)+', '+location.point.lng.toFixed(5));}
       setLocating(false);
-      const input:SearchInput=previous?{...previous.input,origin:previous.origin,seenPlaceIds:previous.destinations.map(d=>d.id),explorationPage:(previous.input.explorationPage??0)+1}:{theme,source,origin:prepared!.origin,mode,metric,budget:Number(budget),...(minBudget.trim()?{minBudget:Number(minBudget)}:{}),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
+      const input:SearchInput=previous?{...previous.input,origin:previous.origin,seenPlaceIds:previous.destinations.map(d=>d.id),explorationPage:(previous.input.explorationPage??0)+1}:{theme,source,origin:prepared!.origin,...(chosenOrigin?{originLabel:chosenOrigin.label}:{}),mode,metric,budget:Number(budget),...(minBudget.trim()?{minBudget:Number(minBudget)}:{}),roundTrip,avoidHighways:mode==='DRIVE'&&avoidHighways};
       const response=await fetch(isOwner?'/admin/api/search':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(120000)});
       const data=await response.json() as SearchResult & {error?:string};
       if(!response.ok)throw new Error(data.error??'検索に失敗しました。');
@@ -80,8 +83,8 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
     <main>
       <section className="search-panel" aria-labelledby="search-heading">
         <div className="panel-top"><h1 id="search-heading"><SlidersHorizontal size={17}/>検索条件</h1></div>
-        <form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={busy||locating}><div className="conditions">
-          <div className="condition origin-condition"><label htmlFor="origin"><span className="step">01</span>出発地点</label><div className="input-box"><MapPin size={18}/><input id="origin" value={origin} placeholder="駅名・住所（空欄なら現在地）" onChange={e=>{reset();setGps(null);setGpsAccuracy(null);setOrigin(e.target.value);}} maxLength={200}/><button type="button" className="gps" onClick={()=>void locate()} disabled={!liveAccess} aria-label="現在地を取得" title={liveAccess?'位置情報を許可して現在地を取得':'Googleログインが必要です'}><LocateFixed size={18}/><span>現在地</span></button></div><small>{locating?'現在地を取得しています…':gps?'現在地を取得済み'+(gpsAccuracy!==null&&Number.isFinite(gpsAccuracy)?'（精度目安 ±'+Math.ceil(gpsAccuracy)+'m）':''):'位置情報が使えない場合は手入力できます'}</small></div>
+        <form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={busy||locating||originResolving}><div className="conditions">
+          <div className="condition origin-condition"><label htmlFor="origin"><span className="step">01</span>出発地点</label><div className="input-box"><MapPin size={18}/><OriginInput value={origin} enabled={liveAccess&&liveAvailable} resolved={!!chosenOrigin||!!gps} onResolving={setOriginResolving} onChange={value=>{reset();setChosenOrigin(null);setGps(null);setGpsAccuracy(null);setOrigin(value);}} onSelect={place=>{reset();setGps(null);setGpsAccuracy(null);setChosenOrigin(place);setOrigin(place.label);}}/><button type="button" className="gps" onClick={()=>void locate()} disabled={!liveAccess} aria-label="現在地を取得" title={liveAccess?'位置情報を許可して現在地を取得':'Googleログインが必要です'}><LocateFixed size={18}/><span>現在地</span></button></div><small>{originResolving?'地点を確認しています…':chosenOrigin?'選択済み：'+chosenOrigin.label+(chosenOrigin.address?' · '+chosenOrigin.address:''):locating?'現在地を取得しています…':gps?'現在地を取得済み'+(gpsAccuracy!==null&&Number.isFinite(gpsAccuracy)?'（精度目安 ±'+Math.ceil(gpsAccuracy)+'m）':''):'位置情報が使えない場合は手入力できます'}</small></div>
           <div className="condition"><label><span className="step">02</span>移動手段</label><div className="transport">{modes.map(m=><button key={m.id} type="button" aria-pressed={mode===m.id} onClick={()=>{reset();setMode(m.id);}}><m.icon size={23}/><span>{m.name}</span></button>)}</div>{mode==='DRIVE'&&<div className="highway-option"><label htmlFor="use-highways"><input id="use-highways" type="checkbox" checked={!avoidHighways} onChange={e=>{reset();setAvoidHighways(!e.target.checked);}}/>高速道路を利用する</label></div>}</div>
           <div className="condition budget-condition"><div className="budget-heading"><label htmlFor="budget"><span className="step">03</span>移動時間・距離</label><div className="budget-toggles"><button className="condition-toggle" type="button" aria-label={metric==='time'?'移動条件：時間。距離に切り替える':'移動条件：距離。時間に切り替える'} title={metric==='time'?'距離に切り替える':'時間に切り替える'} onClick={()=>{reset();setMetric(metric==='time'?'distance':'time');}}>{metric==='time'?<Clock3 size={16}/>:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3 3 21M16 3l5 18M12 3v3m0 4v4m0 4v3"/></svg>}<span>{metric==='time'?'時間':'距離'}</span></button><button className="condition-toggle" type="button" aria-label={roundTrip?'移動区分：往復。片道に切り替える':'移動区分：片道。往復に切り替える'} title={roundTrip?'片道に切り替える':'往復に切り替える'} onClick={()=>{reset();setRoundTrip(!roundTrip);}}>{roundTrip?<ArrowLeftRight size={16}/>:<ArrowRight size={16}/>}<span>{roundTrip?'往復':'片道'}</span></button></div></div><div className="budget-range"><div className="range-input range-lower"><input id="min-budget" aria-label={metric==='time'?'移動時間の下限（分・任意）':'移動距離の下限（km・任意）'} type="number" min="0" max={budget||undefined} step="any" value={minBudget} placeholder="下限（目安）" onChange={e=>{reset();setMinBudget(e.target.value);}}/><span>{metric==='time'?'分':'km'}</span></div><span className="range-separator" aria-hidden="true">〜</span><div className="range-input range-upper"><input id="budget" aria-label={metric==='time'?'移動時間の上限（分）':'移動距離の上限（km）'} type="number" min={Math.max(metric==='time'?5:1,Number(minBudget)||0)} max={metric==='time'?480:300} step="any" value={budget} placeholder="上限" onChange={e=>{reset();setBudget(e.target.value);}} required/><span>{metric==='time'?'分':'km'}</span></div></div></div>
         </div><div className="search-actions"><div className="destination-preference"><label><span className="step">04</span>目的地の種類</label><div className="theme-switch" role="group" aria-label="目的地の種類">{(Object.keys(themeLabels) as DestinationTheme[]).map(t=><button key={t} type="button" aria-pressed={theme===t} onClick={()=>{reset();setTheme(t);}}>{themeLabels[t]}</button>)}</div><small>{theme==='reviews'?'条件の近さを優先し、レビュー数を参考に':theme==='highrated'?'条件の近さを優先し、評価を参考に':theme==='nature'?'山・海・渓谷・公園など':theme==='tourism'?'名所・テーマパーク・文化施設・寺社など':'種類を絞らずに探します'}</small></div><div className="search-bottom"><button className="search-button" type="submit" disabled={source==='google'&&(!liveAvailable||searchBlocked)} aria-describedby={searchBlocked?'search-blocked-reason':undefined}>{busy?<><RefreshCw size={19} className="spin"/>{locating?'現在地を取得中…':'探しています…'}</>:searchBlocked?<>検索上限に達しました</>:<>調べる <ArrowRight size={19}/></>}</button></div></div></fieldset></form>

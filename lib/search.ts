@@ -6,6 +6,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   if (input.mode === 'TRANSIT') throw new AppError('電車検索は現在提供していません。日本の公共交通はGoogle Routes APIの対象外です。',422);
   excluded=new Set([...excluded,...(input.seenPlaceIds??[])]);
   const origin = await provider.resolve(input.origin);
+  if(input.originLabel)origin.label=input.originLabel;
   const discovered = (provider.discover ? await provider.discover(origin.point,input) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
   let places=discovered.filter(p=>!excluded.has(p.id)).slice(0,100);

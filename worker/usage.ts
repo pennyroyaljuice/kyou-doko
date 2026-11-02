@@ -1,9 +1,15 @@
 import {cleanKeys,keyHash,redeemKey,type ResetKeys} from '../lib/reset-keys';
 import {emptyPreferences,updatePreferences,type Preferences} from '../lib/preferences';
-import {decideUsage,resetUsage,type ResetScope,type UsageKind,type UsageState} from '../lib/usage-policy';
+import {decideUsage,resetUsage,usageDate,type ResetScope,type UsageKind,type UsageState} from '../lib/usage-policy';
+import {reserveOrigin,type OriginQuotaState} from '../lib/origin-quota';
 export class UsageBudget {
  constructor(private state:DurableObjectState){}
  async fetch(request:Request){
+  if(new URL(request.url).pathname==='/origin'){
+   if(request.method!=='POST')return new Response(null,{status:405});
+   const body=await request.json() as {subject:string;owner?:boolean};if(!/^[a-f0-9]{64}$/.test(body.subject))return new Response(null,{status:400});
+   const result=await this.state.storage.transaction(async tx=>{const data=await tx.get<OriginQuotaState>('origin-quota')??{days:{}};const result=reserveOrigin(data,body.subject,Date.now(),body.owner===true);await tx.put('origin-quota',data);return result;});if(!await this.state.storage.getAlarm())await this.state.storage.setAlarm(Date.now()+86400000);return Response.json(result);
+  }
   if(['/keys/issue','/keys/redeem'].includes(new URL(request.url).pathname)){
    if(request.method!=='POST')return new Response(null,{status:405});
    try{const body=await request.json() as {subject:string;code?:string};if(!/^[a-f0-9]{64}$/.test(body.subject))return new Response(null,{status:400});const issue=new URL(request.url).pathname==='/keys/issue',now=Date.now();
@@ -31,12 +37,18 @@ export class UsageBudget {
   return Response.json(result,{headers:{'Cache-Control':'no-store'}});
  }
  async alarm(){
+  const origins=await this.state.storage.get<OriginQuotaState>('origin-quota');if(origins){const cutoff=usageDate(Date.now()-31*86400000);for(const day of Object.keys(origins.days))if(day<cutoff)delete origins.days[day];if(Object.keys(origins.days).length){await this.state.storage.put('origin-quota',origins);await this.state.storage.setAlarm(Date.now()+86400000);}else await this.state.storage.delete('origin-quota');}
   const state=await this.state.storage.get<UsageState>('usage');if(!state)return;
   decideUsage(state,'cleanup','search',Date.now(),false);
   if(Object.keys(state.days).length){await this.state.storage.put('usage',state);await this.state.storage.setAlarm(Date.now()+86400000);}else await this.state.storage.delete('usage');
  }
 }
 export type UsageEnvironment={USAGE_BUDGET?:DurableObjectNamespace};
+export async function checkOriginQuota(env:UsageEnvironment,sub:string,owner=false){
+ if(!env.USAGE_BUDGET)throw Error('Origin budget unavailable');
+ const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));const subject=[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
+ const response=await env.USAGE_BUDGET.get(env.USAGE_BUDGET.idFromName('global-v1')).fetch('https://usage.internal/origin',{method:'POST',body:JSON.stringify({subject,owner})});if(!response.ok)throw Error('Origin budget unavailable');return response.json() as Promise<{allowed:boolean}>;
+}
 export async function checkUsage(env:UsageEnvironment,sub:string,kind:UsageKind,reserve:boolean,unlimited=false,includeRatings=false){
  if(!env.USAGE_BUDGET)throw Error('Usage budget unavailable');
  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('google:'+sub));const subject=[...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
