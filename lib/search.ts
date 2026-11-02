@@ -7,18 +7,30 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   excluded=new Set([...excluded,...(input.seenPlaceIds??[])]);
   const origin = await provider.resolve(input.origin);
   if(input.originLabel)origin.label=input.originLabel;
-  const discovered = (provider.discover ? await provider.discover(origin.point,input) : await provider.nearby(origin.point,radius(input),input.theme));
+  const start = new Date();
+  const routeMode=input.mode==='BICYCLE'?'WALK':input.mode;
+  const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
+  let routeCalls=0;const routeLimit=24;
+  // Measure each direction itself, rather than project a road speed measured
+  // across a different bay or mountain range. These probes share the same cap.
+  const calibrate=async(center:typeof origin.point)=>{
+    if(routeCalls>=routeLimit)return center;
+    routeCalls++;
+    const leg=await getLeg(origin.point,center,start);
+    if(!leg)return pointAlongBearing(origin.point,center,distance(origin.point,center)*0.55);
+    const value=(input.metric==='time'?leg.seconds/60:leg.meters/1000)*(input.roundTrip?2:1);
+    if(value<=0)return center;
+    const reach=Math.min(1000000,radius(input)*(input.mode==='DRIVE'&&input.metric==='time'?(input.avoidHighways?1.4:2):1));
+    return pointAlongBearing(origin.point,center,Math.max(100,Math.min(reach*.98,distance(origin.point,center)*input.budget*.95/value)));
+  };
+  const discovered = (provider.discover ? await provider.discover(origin.point,input,provider.radialDiscovery?calibrate:undefined) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
   let places=discovered.filter(p=>!excluded.has(p.id)).slice(0,100);
   const ratingPriority=(a:typeof places[number],b:typeof places[number])=>input.theme==='reviews'?(b.userRatingCount??0)-(a.userRatingCount??0)||(b.rating??0)-(a.rating??0):input.theme==='highrated'?(b.rating??0)-(a.rating??0)||(b.userRatingCount??0)-(a.userRatingCount??0):0;
 
   let unavailable = 0;
   const items:Destination[] = [],belowMinimum:Destination[]=[];
-  const start = new Date();
-  const routeMode=input.mode==='BICYCLE'?'WALK':input.mode;
-  const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
   // Reserve a bounded route budget; retain discovery reserves for rejected candidates.
-  let routeCalls=0;const routeLimit=24;
   let refinements=0,failed=0;
   const refinementLimit=Math.min(3,Math.max(0,provider.refinementLimit??1));
   const estimates:number[]=[];
@@ -45,8 +57,11 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     // A nearby island/mountain route can take far longer despite similar air
     // distance. Do not treat that discontinuity as a smooth cost gradient.
     const usableSlope=best&&slope>best.cost/best.direct*0.2&&slope<best.cost/best.direct*3;
-    const desired=best?(usableSlope?best.direct+(input.budget*0.98-best.cost)/slope:best.direct*input.budget*0.98/best.cost):0;
-    const area=best?{center:pointAlongBearing(origin.point,crossDirection??best.point,Math.max(100,Math.min(refinementReach*0.98,desired))),radius:Math.max(100,Math.min(50000,reach*0.15))}:crossDirection?{center:crossDirection,radius:Math.max(100,Math.min(50000,reach*0.75))}:undefined;
+    // Use the same target margin in all directions. Giving only the final
+    // local refinement a tighter target makes its whole town beat every tile.
+    const targetFraction=provider.radialDiscovery?0.95:0.98;
+    const desired=best?(usableSlope?best.direct+(input.budget*targetFraction-best.cost)/slope:best.direct*input.budget*targetFraction/best.cost):0;
+    const area=crossDirection?{center:await calibrate(crossDirection),radius:Math.max(100,Math.min(50000,reach*0.75))}:best?{center:pointAlongBearing(origin.point,best.point,Math.max(100,Math.min(refinementReach*0.98,desired))),radius:Math.max(100,Math.min(50000,reach*0.15))}:undefined;
     try{extra=await provider.fallback(origin.point,input,area);}catch{return;}
     const seen=new Set(places.map(p=>p.id));refinedIds=new Set();refinedCenter=area?.center;
     for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);}
