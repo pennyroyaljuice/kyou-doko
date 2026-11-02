@@ -19,25 +19,36 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   const getLeg=async(from:typeof origin.point,to:typeof origin.point,departure:Date)=>{const leg=await provider.route(from,to,routeMode,departure,{avoidHighways:input.mode==='DRIVE'&&input.avoidHighways===true});return leg&&input.mode==='BICYCLE'?estimateBicycleLeg(leg):leg;};
   // Reserve a bounded route budget; retain discovery reserves for rejected candidates.
   let routeCalls=0;const routeLimit=24;
-  let fallbackUsed=false,failed=0;
+  let refinements=0,failed=0;
+  const refinementLimit=Math.min(3,Math.max(0,provider.refinementLimit??1));
   const estimates:number[]=[];
   const observations:{point:typeof origin.point;cost:number;direct:number}[]=[];
+  let refinedIds=new Set<string>();
+  let refinedCenter:typeof origin.point|undefined;
+  const emptyRefinementSectors=new Set<number>();
   const attempts:number[]=Array(9).fill(0);
   // Initial circles are conservative. A measured fast road must be allowed to
   // move the refinement beyond that estimate; actual routes still enforce the cap.
-  const refinementReach=Math.min(300000,radius(input)*(input.mode==='DRIVE'&&input.metric==='time'?(input.avoidHighways?1.4:2):1));
+  const refinementReach=Math.min(1000000,radius(input)*(input.mode==='DRIVE'&&input.metric==='time'?(input.avoidHighways?1.4:2):1));
   async function refill(){
-    if(fallbackUsed||!provider.fallback)return;fallbackUsed=true;
+    if(refinements>=refinementLimit||!provider.fallback)return;refinements++;
     let extra:Awaited<ReturnType<NonNullable<typeof provider.fallback>>>;
     const measured=observations.filter(o=>o.direct>100&&o.cost>0).sort((a,b)=>Number(a.cost>input.budget)-Number(b.cost>input.budget)||Math.abs(input.budget-a.cost)-Math.abs(input.budget-b.cost));
-    const best=measured[0],reach=radius(input);
-    const area=best?{center:pointAlongBearing(origin.point,best.point,Math.min(refinementReach*0.95,best.direct*input.budget*0.95/best.cost)),radius:Math.max(100,Math.min(50000,reach*0.2))}:undefined;
+    const best=measured.find(o=>!emptyRefinementSectors.has(directionSector(origin.point,o.point)))??measured[0],reach=radius(input);
+    const peer=best?measured.filter(o=>o!==best&&directionSector(origin.point,o.point)===directionSector(origin.point,best.point)&&Math.abs(o.direct-best.direct)>500&&(o.cost-input.budget)*(best.cost-input.budget)<0).sort((a,b)=>Math.abs(a.direct-best.direct)-Math.abs(b.direct-best.direct))[0]:undefined;
+    const slope=best&&peer?(best.cost-peer.cost)/(best.direct-peer.direct):0;
+    // A nearby island/mountain route can take far longer despite similar air
+    // distance. Do not treat that discontinuity as a smooth cost gradient.
+    const usableSlope=best&&slope>best.cost/best.direct*0.2&&slope<best.cost/best.direct*3;
+    const desired=best?(usableSlope?best.direct+(input.budget*0.98-best.cost)/slope:best.direct*input.budget*0.98/best.cost):0;
+    const area=best?{center:pointAlongBearing(origin.point,best.point,Math.max(100,Math.min(refinementReach*0.98,desired))),radius:Math.max(100,Math.min(50000,reach*0.15))}:undefined;
     try{extra=await provider.fallback(origin.point,input,area);}catch{return;}
-    const seen=new Set(places.map(p=>p.id));
-    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);places.push(p);}
+    const seen=new Set(places.map(p=>p.id));refinedIds=new Set();refinedCenter=area?.center;
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&(input.theme!=='highrated'||highlyRated(p))&&(input.theme!=='reviews'||(p.userRatingCount??0)>0)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);}
+    if(!refinedIds.size&&best)emptyRefinementSectors.add(directionSector(origin.point,best.point));
   }
   for (let i=0;routeCalls<routeLimit;i+=2) {
-    if(i>=4||i>=places.length){
+    if((i>=4&&i<=8)||i>=places.length){
       await refill();
     }
     const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
@@ -45,16 +56,26 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     const fillFirst=failed>=2&&accepted<8&&remaining<=(8-accepted)*(input.roundTrip?2:1)+4;
     // Preserve enough of the route budget to fill the list after repeated over-budget routes.
     const target=factor?input.budget*(fillFirst?0.75:1):radius(input)*explorationFraction(input);
-    const score=(p:typeof places[number])=>Math.abs(distance(origin.point,p.point)*(factor??1)-target);
-    const quality=(p:typeof places[number])=>Math.floor(score(p)/Math.max(1,target*0.1));
-    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||(distance(origin.point,p.point)*factor<=input.budget&&distance(origin.point,p.point)*factor>=(fillFirst?0:input.minBudget??0));
+    const predictedValues=new Map<string,number>();
+    const predicted=(p:typeof places[number])=>{
+      const cached=predictedValues.get(p.id);if(cached!==undefined)return cached;
+      const local=observations.filter(o=>o.direct>100&&directionSector(origin.point,o.point)===directionSector(origin.point,p.point)).sort((a,b)=>Math.abs(a.direct-distance(origin.point,p.point))-Math.abs(b.direct-distance(origin.point,p.point)))[0];
+      const value=distance(origin.point,p.point)*(local?local.cost/local.direct:factor??1);predictedValues.set(p.id,value);return value;
+    };
+    const score=(p:typeof places[number])=>Math.abs(predicted(p)-target);
+    const quality=(p:typeof places[number])=>Math.floor(score(p)/Math.max(1,target*0.03));
+    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||(predicted(p)<=input.budget&&predicted(p)>=(fillFirst?0:input.minBudget??0));
     // Defer predicted over-budget candidates, but still check them if needed; never fabricate or reject a route on this estimate alone.
     const preferred=pending.filter(withinEstimate),reserve=pending.filter(p=>!withinEstimate(p));
     // Once eight candidates exist, spend the remaining bounded budget checking possible improvements too.
     const improvementPool=items.length+belowMinimum.length>=8;
     const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts,quality);
-    places=[...places.slice(0,i),...(improvementPool?order(pending):[...order(preferred),...order(reserve)])];
-    if(i>=places.length)break;
+    const ordered=improvementPool?order(pending):[...order(preferred),...order(reserve)];
+    // Measure two newly discovered places before spending the next refinement.
+    const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,2),probeIds=new Set(probes.map(p=>p.id));
+    places=[...places.slice(0,i),...probes,...ordered.filter(p=>!probeIds.has(p.id))];
+    refinedIds.clear();
+    if(i>=places.length){if(provider.fallback&&refinements<refinementLimit){i-=2;continue;}break;}
     const batch = await Promise.all(places.slice(i,i+2).map(async p=>{
       attempts[directionSector(origin.point,p.point)]++;
       if (input.metric === 'distance' && distance(origin.point,p.point)*(input.roundTrip?2:1)>input.budget*1000) return null;
@@ -83,7 +104,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   const order=(pool:Destination[])=>input.theme==='reviews'?sortDestinations(pool,input,'reviews'):input.theme==='highrated'?sortDestinations(pool,input,'rating'):rank(pool,input);
   const actualValue=(d:Destination)=>input.metric==='time'?d.seconds/60:d.meters/1000;
-  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.1)));
+  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)));
   const selected=choose(items).slice(0,8);
   const ranked=[...order(selected),...order(choose(belowMinimum).slice(0,8-selected.length))];
   if(input.mode==='BICYCLE')notices.push(`自転車は推定値です。徒歩経路の距離を平均時速${bicycleSpeedKmh}kmで換算しています。階段・歩行者専用道など、自転車で通行できない道を含む可能性があります。実際の自転車経路・距離・時間は外部Google Mapsで確認してください。`);
