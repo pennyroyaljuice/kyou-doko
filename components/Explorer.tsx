@@ -92,13 +92,8 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
       </section>
       {searchBlocked&&<div id="search-blocked-reason" className="setup-banner" role="status"><span>{blockedReason}</span></div>}
       {publicEnabled&&!signedIn&&<div className="setup-banner"><span>Googleログインで1日5回まで検索できます（日本時間0時更新）。</span><a href="/login">Googleでログイン</a></div>}
-      {signedIn&&<section className="usage-panel" aria-labelledby="usage-heading">
-        <div className="usage-panel-header"><h2 id="usage-heading">利用状況</h2><span className="usage-status" role="status">{isOwner?'管理者 · 回数制限なし':usage?<>本日の検索 あと<strong>{usage.remaining}</strong>回 / 5回</>:'利用状況を確認中…'}</span><button className="usage-refresh-button" onClick={()=>void refreshUsage()}><RefreshCw size={16}/>更新</button></div>
-        {isOwner&&usage?.rolling?<div className="usage-statistics"><span>一般：本日{usage.dailySearches}回 · 直近32日{usage.rolling.search}回</span><span>管理者：本日{usage.dailyAdminSearches??0}回 · 直近32日{usage.adminRolling?.search??0}回</span></div>:!isOwner&&<p className="usage-reset-time">日本時間0時更新</p>}
-        <div className="usage-panel-tools">{isOwner&&<AdminUsage refreshVersion={usage} onReset={()=>void refreshUsage()}/>}<ResetKey owner={isOwner} onReset={()=>void refreshUsage()}/></div>
-      </section>}
       {liveAccess&&source==='google'&&!liveAvailable&&<div className="setup-banner" role="status"><span>通常検索は準備中です。現在地の取得・手入力はできますが、候補・経路検索には設定が必要です。</span><a href="/admin/setup">設定手順</a></div>}
-      {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
+
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button aria-label="エラーを閉じる" onClick={()=>setError('')}><X size={18}/></button></div>}
       <section className="results-section" aria-labelledby="results-heading" aria-busy={busy}>
         <div className="results-header"><div><h2 id="results-heading">{result?'検索結果':'目的地候補'}{result&&<span className="count">{result.destinations.length}件</span>}</h2></div><div className="result-tools">{result&&<label className="sort-control">並び順<select value={resultSort} onChange={e=>{const sort=e.target.value as 'budget'|'rating'|'reviews';setResultSort(sort);setResult(current=>current?{...current,destinations:sortDestinations(current.destinations,current.input,sort)}:current);if(listRef.current)listRef.current.scrollTop=0;}}><option value="budget">条件に近い順</option><option value="rating" disabled={!result.ratingsAvailable}>Google評価順</option><option value="reviews" disabled={!result.ratingsAvailable}>レビュー数順</option></select></label>}{result&&<button className="reshuffle" disabled={busy||result.destinations.length<2} onClick={shuffle}><RefreshCw size={15}/>次の候補</button>}<div className="view-switch"><button aria-pressed={view==='list'} onClick={()=>setView('list')}><Route size={16}/>一覧</button><button aria-pressed={view==='map'} onClick={()=>setView('map')}><Map size={16}/>地図</button></div></div></div>
@@ -113,9 +108,18 @@ export default function Explorer({liveAvailable,liveAccess,signedIn,isOwner=fals
           </div>
         </div>
 
-        {isOwner&&result?.auditHistory&&<SearchAuditPanel history={result.auditHistory}/>}
+
         {result&&<div className="result-notices" aria-live="polite">{result.notices.map(n=><p key={n}>{n}</p>)}{(result.input.mode==='WALK'||result.input.mode==='BICYCLE')&&<p>徒歩・自転車の経路はベータ版です。歩道・自転車道の情報が不完全な場合があります。現地の交通規制と安全を確認してください。</p>}{result.source==='google'&&<div className="google-attribution"><img src="https://maps.gstatic.com/mapfiles/api-3/images/google_gray.svg" alt="Google Maps" width="80" height="26"/><span>目的地・経路情報提供</span></div>}</div>}
       </section>
+      <div className="options-section">
+      {signedIn&&<section className="usage-panel" aria-labelledby="usage-heading">
+        <div className="usage-panel-header"><h2 id="usage-heading">利用状況</h2><span className="usage-status" role="status">{isOwner?'管理者 · 回数制限なし':usage?<>本日の検索 あと<strong>{usage.remaining}</strong>回 / 5回</>:'利用状況を確認中…'}</span><button className="usage-refresh-button" onClick={()=>void refreshUsage()}><RefreshCw size={16}/>更新</button></div>
+        {isOwner&&usage?.rolling?<div className="usage-statistics"><span>一般：本日{usage.dailySearches}回 · 直近32日{usage.rolling.search}回</span><span>管理者：本日{usage.dailyAdminSearches??0}回 · 直近32日{usage.adminRolling?.search??0}回</span></div>:!isOwner&&<p className="usage-reset-time">日本時間0時更新</p>}
+        <div className="usage-panel-tools">{isOwner&&<AdminUsage refreshVersion={usage} onReset={()=>void refreshUsage()}/>}<ResetKey owner={isOwner} onReset={()=>void refreshUsage()}/></div>
+      </section>}
+      {signedIn&&<PlacePreferences prefs={prefs} saving={prefSaving} error={prefError} save={savePreference}/>}
+      {isOwner&&result?.auditHistory&&<SearchAuditPanel history={result.auditHistory}/>}
+      </div>
     </main><footer><span className="footer-brand">ココからドコへ？</span><div><a href="/terms">利用規約</a><a href="/privacy">プライバシー</a><span>© {new Date().getFullYear()} ココからドコへ？</span></div></footer>
   </>;
 }
