@@ -30,7 +30,9 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   };
   const discovered = (provider.discover ? await provider.discover(origin.point,input,provider.radialDiscovery?calibrate:undefined) : await provider.nearby(origin.point,radius(input),input.theme));
   const excludedCount=discovered.filter(p=>excluded.has(p.id)).length;
-  let places=discovered.filter(p=>!excluded.has(p.id)).slice(0,100);
+  const ratingTheme=input.theme==='highrated'||input.theme==='reviews';
+  const eligible=(p:typeof discovered[number])=>!ratingTheme||(typeof p.rating==='number'&&Number.isFinite(p.rating)&&p.rating>=1&&p.rating<=5&&typeof p.userRatingCount==='number'&&Number.isFinite(p.userRatingCount)&&p.userRatingCount>0);
+  let places=discovered.filter(p=>!excluded.has(p.id)&&eligible(p)).slice(0,100);
   const auditDiscovered=(pool:typeof places)=>{for(const p of pool)audit.sectors[directionSector(origin.point,p.point)].discovered++;};
   auditDiscovered(places);audit.discoveryAreas=provider.radialDiscovery?2:1;
   const ratingPriority=(a:typeof places[number],b:typeof places[number])=>input.theme==='reviews'?(b.userRatingCount??0)-(a.userRatingCount??0)||(b.rating??0)-(a.rating??0):input.theme==='highrated'?(b.rating??0)-(a.rating??0)||(b.userRatingCount??0)-(a.userRatingCount??0):0;
@@ -71,7 +73,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     if(area&&!crossDirection)audit.sectors[directionSector(origin.point,area.center)].queries++;
     try{extra=await provider.fallback(origin.point,input,area);}catch{audit.discoveryFailures++;return;}
     const seen=new Set(places.map(p=>p.id));refinedIds=new Set();refinedCenter=area?.center;
-    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);auditDiscovered([p]);}
+    for(const p of extra)if(!seen.has(p.id)&&!excluded.has(p.id)&&eligible(p)&&distance(origin.point,p.point)<=refinementReach){seen.add(p.id);refinedIds.add(p.id);places.push(p);auditDiscovered([p]);}
     if(!refinedIds.size&&area)emptyRefinementSectors.add(directionSector(origin.point,area.center));
   }
   for (let i=0;budget.used<routeLimit;i++) {
@@ -96,11 +98,13 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     const preferred=pending.filter(withinEstimate),reserve=pending.filter(p=>!withinEstimate(p));
     // Once eight candidates exist, spend the remaining bounded budget checking possible improvements too.
     const improvementPool=items.length+belowMinimum.length>=8;
-    const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>score(a)-score(b)||ratingPriority(a,b),items,attempts,quality);
+    // Cost bands and spatial spread stay first; rating can beat a small cost
+    // difference within a band instead of requiring an exact cost tie.
+    const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts,quality);
     const ordered=improvementPool?order(pending):[...order(preferred),...order(reserve)];
     // Keep a local refinement probe while respecting untested-direction reserves.
     const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,1),probeIds=new Set(probes.map(p=>p.id));
-    const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>score(a)-score(b),[],[],quality);
+    const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),[],[],quality);
     const firstBySector=untested.filter((p,index)=>untested.findIndex(other=>directionSector(origin.point,other.point)===directionSector(origin.point,p.point))===index),firstIds=new Set(firstBySector.map(p=>p.id));
     places=[...places.slice(0,i),...firstBySector,...probes.filter(p=>!firstIds.has(p.id)),...ordered.filter(p=>!probeIds.has(p.id)&&!firstIds.has(p.id))];
     // Reserved directions may postpone a refinement probe; retain it until tried.
@@ -141,7 +145,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   const actualValue=(d:Destination)=>input.metric==='time'?d.seconds/60:d.meters/1000;
   const order=(pool:Destination[])=>[...pool].sort((a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b));
-  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)));
+  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)));
   const selected=choose(items).slice(0,8);
   const ranked=[...order(selected),...order(choose(belowMinimum).slice(0,8-selected.length))];
   for(const p of ranked)audit.sectors[directionSector(origin.point,p.point)].selected++;

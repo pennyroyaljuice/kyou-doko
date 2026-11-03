@@ -15,7 +15,7 @@ async function radialSearch(input:SearchInput){
    const c=body.locationRestriction.circle.center,center={lat:c.latitude,lng:c.longitude};
    requests.push({center,rank:body.rankPreference});
    const sector=directionSector(origin,center);
-   return Response.json({places:Array.from({length:20},(_,i)=>({id:`tile-${requests.length}-${i}`,displayName:{text:'合成スポット'},location:{latitude:center.lat+(i-9.5)*0.0003,longitude:center.lng},types:['park','tourist_attraction'],primaryType:'park',rating:sector===1?5:3.5,userRatingCount:sector===1?10000:0}))});
+   return Response.json({places:Array.from({length:20},(_,i)=>({id:`tile-${requests.length}-${i}`,displayName:{text:'合成スポット'},location:{latitude:center.lat+(i-9.5)*0.0003,longitude:center.lng},types:['park','tourist_attraction'],primaryType:'park',rating:sector===1?5:3.5,userRatingCount:i===0?0:sector===1?10000:10}))});
   }
   routeCalls++;const a=body.origin.location.latLng,b=body.destination.location.latLng;
   const meters=distance({lat:a.latitude,lng:a.longitude},{lat:b.latitude,lng:b.longitude})*1.3;
@@ -33,13 +33,13 @@ it.each(inputs)('$theme / $metric / 往復=$roundTrip / 追加=$explorationPage 
  expect(values.length).toBeGreaterThan(0);expect(Math.max(...values)).toBeLessThanOrEqual(120);expect(Math.max(...values)).toBeGreaterThanOrEqual(108);
  expect(values).toEqual([...values].sort((a,b)=>b-a));
 });
-it('すべて・高評価・レビュー数は同じ地理範囲と候補母集団で近さを優先する',async()=>{
+it('評価条件でも最初の四方向の地理探索は共通とし評価ありだけを採用する',async()=>{
  const results=[];for(const theme of ['all','highrated','reviews'] as const)results.push(await radialSearch({source:'google',origin,mode:'DRIVE',metric:'time',budget:120,roundTrip:true,theme}));
- const base=results[0];for(const r of results.slice(1)){expect(r.requests).toEqual(base.requests);expect(r.result.destinations.map(d=>d.id)).toEqual(base.result.destinations.map(d=>d.id));}
- expect(base.result.destinations.some(d=>(d.rating??0)<4&&d.userRatingCount===0)).toBe(true);
+ const base=results[0];for(const r of results.slice(1)){expect(r.requests.slice(0,4)).toEqual(base.requests.slice(0,4));expect(r.result.destinations.every(d=>(d.userRatingCount??0)>0)).toBe(true);}
+ expect(base.result.destinations.some(d=>(d.rating??0)<4)).toBe(true);
 });
-it.each(['highrated','reviews'] as const)('%sでも低評価・レビューなしの近い候補を高評価の遠い候補より優先',async theme=>{
- const near:Place={id:'near',name:'near',point:pointAlongBearing(origin,{lat:36,lng:139.7},39000),category:'公園',description:'',rating:3,userRatingCount:0};
+it.each(['highrated','reviews'] as const)('%sでも低評価・レビュー1件の近い候補を高評価の遠い候補より優先',async theme=>{
+ const near:Place={id:'near',name:'near',point:pointAlongBearing(origin,{lat:36,lng:139.7},39000),category:'公園',description:'',rating:3,userRatingCount:1};
  const rated:Place={...near,id:'rated',name:'rated',point:pointAlongBearing(origin,{lat:36,lng:139.7},33000),rating:5,userRatingCount:100000};
  const found=await search({source:'google',origin,mode:'DRIVE',metric:'time',budget:120,roundTrip:true,theme},{resolve:async()=>({point:origin,label:'起点'}),nearby:async()=>[rated,near],route:async(from,to)=>({seconds:(to===near.point||from===near.point?119:100)*30,meters:40000})});
  expect(found.destinations.map(d=>d.id)).toEqual(['near','rated']);
