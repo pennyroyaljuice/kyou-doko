@@ -27,3 +27,18 @@ it.each(['highrated','reviews'] as const)('%s: 初回と補充でも欠落・0�
 it('すべてでは評価なしを除外しない',async()=>{
  const found=await search(input,{resolve:async()=>({point:origin,label:'起点'}),nearby:async()=>[make('no-rating')],route:async()=>({seconds:6000,meters:30000})});expect(found.destinations.map(p=>p.id)).toEqual(['no-rating']);
 });
+
+it.each(['time','distance'] as const)('%s: rating preferences include shorter strong places only without a lower bound',async metric=>{
+ for(const roundTrip of [false,true])for(const theme of ['highrated','reviews'] as const){
+ const places=Array.from({length:16},(_,i)=>make(String(i),i<8?4:5,i<8?20:1000));
+ const run=(minBudget?:number)=>search({...input,metric,roundTrip,theme,minBudget},{resolve:async()=>({point:origin,label:'origin'}),nearby:async()=>places,route:async(a,b)=>{const i=places.findIndex(p=>p.point===b||p.point===a);const value=i<8?115:60;return {seconds:value*60/(roundTrip?2:1),meters:value*1000/(roundTrip?2:1)};}});
+ const broad=await run(),bounded=await run(100);
+ expect(broad.destinations).toHaveLength(8);expect(broad.destinations.every(p=>p.rating===5)).toBe(true);
+ expect(bounded.destinations.every(p=>(metric==='time'?p.seconds/60:p.meters/1000)>=100)).toBe(true);
+ expect(bounded.destinations.every(p=>p.rating===4)).toBe(true);
+ }
+});
+it('rating lower bound never fills with out-of-range places',async()=>{
+ const found=await search({...input,theme:'reviews',minBudget:100},{resolve:async()=>({point:origin,label:'origin'}),nearby:async()=>[make('short',5,1000)],route:async()=>({seconds:60*60,meters:20000})});
+ expect(found.destinations).toHaveLength(0);
+});

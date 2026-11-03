@@ -82,7 +82,7 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
       await refill();
     }
     const measured=[...estimates].sort((a,b)=>a-b),factor=measured.length?measured[Math.floor(measured.length/2)]:null;
-    const accepted=items.length+belowMinimum.length,remaining=routeLimit-budget.used;
+    const accepted=items.length+(ratingTheme?0:belowMinimum.length),remaining=routeLimit-budget.used;
     const fillFirst=failed>=2&&accepted<8&&remaining<=(8-accepted)*(input.roundTrip?2:1)+4;
     // Relax the planning lower bound when filling, but keep the upper target.
     const target=factor?input.budget:radius(input)*explorationFraction(input);
@@ -93,16 +93,15 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
       const value=distance(origin.point,p.point)*(local?local.cost/local.direct:factor??1);predictedValues.set(p.id,value);return value;
     };
     const score=(p:typeof places[number])=>Math.abs(predicted(p)-target);
-    const quality=(p:typeof places[number])=>Math.floor(score(p)/Math.max(1,target*0.03));
-    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||(predicted(p)<=input.budget&&predicted(p)>=(fillFirst?0:input.minBudget??0));
+    const quality=(p:typeof places[number])=>(ratingTheme?places.filter(other=>ratingPriority(other,p)<0).length*10000:0)+Math.floor(score(p)/Math.max(1,target*0.03));
+    const pending=places.slice(i),withinEstimate=(p:typeof places[number])=>factor===null||(predicted(p)<=input.budget&&predicted(p)>=(fillFirst&&!ratingTheme?0:input.minBudget??0));
     // Defer predicted over-budget candidates, but still check them if needed; never fabricate or reject a route on this estimate alone.
     const preferred=pending.filter(withinEstimate),reserve=pending.filter(p=>!withinEstimate(p));
     // Once eight candidates exist, spend the remaining bounded budget checking possible improvements too.
     const improvementPool=items.length+belowMinimum.length>=8;
-    // Cost bands and spatial spread stay first; rating can beat a small cost
-    // difference within a band instead of requiring an exact cost tie.
+    // Rating themes prioritize reputation; other themes retain proximity bands.
     const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts,quality,placeKind);
-    const ordered=improvementPool?order(pending):[...order(preferred),...order(reserve)];
+    const ordered=improvementPool&&!ratingTheme?order(pending):[...order(preferred),...order(reserve)];
     // Keep a local refinement probe while respecting untested-direction reserves.
     const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,1),probeIds=new Set(probes.map(p=>p.id));
     const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),[],[],quality,placeKind);
@@ -146,9 +145,9 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   const actualValue=(d:Destination)=>input.metric==='time'?d.seconds/60:d.meters/1000;
   const order=(pool:Destination[])=>[...pool].sort((a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b));
-  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)),placeKind);
+  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>(ratingTheme?pool.filter(other=>ratingPriority(other,d)<0).length*10000:0)+Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)),placeKind);
   const selected=choose(items).slice(0,8);
-  const ranked=[...order(selected),...order(choose(belowMinimum).slice(0,8-selected.length))];
+  const ranked=[...order(selected),...order(choose(ratingTheme?[]:belowMinimum).slice(0,8-selected.length))];
   for(const p of ranked)audit.sectors[directionSector(origin.point,p.point)].selected++;
   audit.categories=[...new Set(places.map(placeKind))].map(kind=>({kind,candidates:places.filter(p=>placeKind(p)===kind).length,selected:ranked.filter(p=>placeKind(p)===kind).length}));
   audit.routeCalls=budget.used;onAudit?.(audit);

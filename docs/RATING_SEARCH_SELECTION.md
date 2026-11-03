@@ -1,5 +1,7 @@
 # 検索条件としての高評価・レビュー数（2026-11-03）
 
+最新の評価条件・下限指定の優先順位は [RATING_RANGE_SELECTION.md](RATING_RANGE_SELECTION.md) を参照。
+
 後続の候補収集の変更は [THEME_DISCOVERY.md](THEME_DISCOVERY.md) を参照。評価条件でも自然・観光の収集枠を確保する。評価ありの判定と同程度の近さでの指標比較は維持する。
 
 ## 変更の理由
