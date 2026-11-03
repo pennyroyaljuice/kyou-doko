@@ -15,7 +15,7 @@ async function radialSearch(input:SearchInput){
    const c=body.locationRestriction.circle.center,center={lat:c.latitude,lng:c.longitude};
    requests.push({center,rank:body.rankPreference});
    const sector=directionSector(origin,center);
-   return Response.json({places:Array.from({length:20},(_,i)=>({id:`tile-${requests.length}-${i}`,displayName:{text:'合成スポット'},location:{latitude:center.lat+(i-9.5)*0.0003,longitude:center.lng},types:['park','tourist_attraction'],primaryType:'park',rating:sector===1?5:3.5,userRatingCount:i===0?0:sector===1?10000:10}))});
+   return Response.json({places:Array.from({length:20},(_,i)=>({id:`tile-${requests.length}-${i}`,displayName:{text:'合成スポット'},location:{latitude:center.lat+(i-9.5)*0.0003,longitude:center.lng},types:[body.includedPrimaryTypes[i%body.includedPrimaryTypes.length]],primaryType:body.includedPrimaryTypes[i%body.includedPrimaryTypes.length],rating:sector===1?5:3.5,userRatingCount:i===0?0:sector===1?10000:10}))});
   }
   routeCalls++;const a=body.origin.location.latLng,b=body.destination.location.latLng;
   const meters=distance({lat:a.latitude,lng:a.longitude},{lat:b.latitude,lng:b.longitude})*1.3;

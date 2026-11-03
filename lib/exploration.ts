@@ -28,20 +28,24 @@ export function directionSector(origin:Point,point:Point){
  const y=Math.sin(dl)*Math.cos(point.lat*rad),x=Math.cos(origin.lat*rad)*Math.sin(point.lat*rad)-Math.sin(origin.lat*rad)*Math.cos(point.lat*rad)*Math.cos(dl);
  return Math.floor(((Math.atan2(y,x)*180/Math.PI+382.5)%360)/45);
 }
-export function geographicOrder<T extends Place>(places:T[],origin:Point,compare:(a:T,b:T)=>number,selected:Place[]=[],attempts:number[]=[],quality?:(p:T)=>number):T[]{
+export function geographicOrder<T extends Place>(places:T[],origin:Point,compare:(a:T,b:T)=>number,selected:Place[]=[],attempts:number[]=[],quality?:(p:T)=>number,kind?:(p:T)=>string):T[]{
  const groups=Array.from({length:9},()=>[] as T[]),counts=Array(9).fill(0) as number[],tried=Array.from({length:9},(_,i)=>attempts[i]??0);
  for(const p of selected)counts[directionSector(origin,p.point)]++;
  for(const p of places)groups[directionSector(origin,p.point)].push(p);
  for(const group of groups)group.sort((a,b)=>(quality?quality(a)-quality(b):0)||compare(a,b));
  const result:T[]=[];
+ const kindCounts=new Map<string,number>();
+ if(kind)for(const p of selected){const key=kind(p as T);kindCounts.set(key,(kindCounts.get(key)??0)+1);}
+ const sameKind=(p:T)=>kind?(kindCounts.get(kind(p))??0):0;
  const thresholds=new Map(places.map(p=>[p.id,Math.max(250,Math.min(10000,distance(origin,p.point)*0.08))]));
  const crowded=new Map(places.map(p=>[p.id,selected.filter(other=>distance(other.point,p.point)<thresholds.get(p.id)!).length]));
  const neighbors=(p:Place)=>crowded.get(p.id)??0;
  while(result.length<places.length){const available=groups.map((g,i)=>g.length?i:-1).filter(i=>i>=0);if(!available.length)break;
   // Spatial separation is only a tie-break within the existing cost band.
-  for(const group of groups)group.sort((a,b)=>(quality?quality(a)-quality(b):0)||neighbors(a)-neighbors(b)||compare(a,b));
-  available.sort((a,b)=>(quality?quality(groups[a][0])-quality(groups[b][0]):0)||counts[a]-counts[b]||neighbors(groups[a][0])-neighbors(groups[b][0])||tried[a]-tried[b]||compare(groups[a][0],groups[b][0])||a-b);
+  for(const group of groups)group.sort((a,b)=>(quality?quality(a)-quality(b):0)||sameKind(a)-sameKind(b)||neighbors(a)-neighbors(b)||compare(a,b));
+  available.sort((a,b)=>(quality?quality(groups[a][0])-quality(groups[b][0]):0)||counts[a]-counts[b]||sameKind(groups[a][0])-sameKind(groups[b][0])||neighbors(groups[a][0])-neighbors(groups[b][0])||tried[a]-tried[b]||compare(groups[a][0],groups[b][0])||a-b);
   const sector=available[0],chosen=groups[sector].shift()!;result.push(chosen);counts[sector]++;tried[sector]++;
+  if(kind){const key=kind(chosen);kindCounts.set(key,(kindCounts.get(key)??0)+1);}
   for(const group of groups)for(const p of group)if(distance(chosen.point,p.point)<thresholds.get(p.id)!)crowded.set(p.id,neighbors(p)+1);
  }
  return result;

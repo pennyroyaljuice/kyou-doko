@@ -2,6 +2,7 @@ import {directionSector,geographicOrder,explorationAreas,explorationFraction,poi
 import {estimateBicycleLeg,bicycleSpeedKmh} from './bicycle-estimate';
 import { AppError, distance, radius, rank, totals, type SearchInput, type SearchResult, type Destination } from './domain';
 import type { DiscoveryProvider } from './providers';
+import {placeKind} from './themes';
 import {DirectionalRouteBudget} from './route-budget';
 import {newSearchAudit,type SearchAudit} from './search-audit';
 export async function search(input:SearchInput, provider:DiscoveryProvider, excluded:ReadonlySet<string>=new Set(),onAudit?:(audit:SearchAudit)=>void):Promise<SearchResult> {
@@ -100,11 +101,11 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
     const improvementPool=items.length+belowMinimum.length>=8;
     // Cost bands and spatial spread stay first; rating can beat a small cost
     // difference within a band instead of requiring an exact cost tie.
-    const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts,quality);
+    const order=(pool:typeof places)=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),items,attempts,quality,placeKind);
     const ordered=improvementPool?order(pending):[...order(preferred),...order(reserve)];
     // Keep a local refinement probe while respecting untested-direction reserves.
     const probes=pending.filter(p=>refinedIds.has(p.id)).sort((a,b)=>refinedCenter?distance(refinedCenter,a.point)-distance(refinedCenter,b.point):score(a)-score(b)).slice(0,1),probeIds=new Set(probes.map(p=>p.id));
-    const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),[],[],quality);
+    const untested=geographicOrder(pending.filter(p=>budget.attempts[directionSector(origin.point,p.point)]===0),origin.point,(a,b)=>ratingPriority(a,b)||score(a)-score(b),[],[],quality,placeKind);
     const firstBySector=untested.filter((p,index)=>untested.findIndex(other=>directionSector(origin.point,other.point)===directionSector(origin.point,p.point))===index),firstIds=new Set(firstBySector.map(p=>p.id));
     places=[...places.slice(0,i),...firstBySector,...probes.filter(p=>!firstIds.has(p.id)),...ordered.filter(p=>!probeIds.has(p.id)&&!firstIds.has(p.id))];
     // Reserved directions may postpone a refinement probe; retain it until tried.
@@ -145,10 +146,11 @@ export async function search(input:SearchInput, provider:DiscoveryProvider, excl
   if (unavailable) notices.push(`${unavailable}件は指定手段の経路が見つからないため除外しました。地域・手段が未対応の場合があります。`);
   const actualValue=(d:Destination)=>input.metric==='time'?d.seconds/60:d.meters/1000;
   const order=(pool:Destination[])=>[...pool].sort((a,b)=>actualValue(b)-actualValue(a)||ratingPriority(a,b));
-  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)));
+  const choose=(pool:Destination[])=>geographicOrder(pool,origin.point,(a,b)=>ratingPriority(a,b)||actualValue(b)-actualValue(a),[],[],d=>Math.floor((input.budget-actualValue(d))/Math.max(1,input.budget*0.03)),placeKind);
   const selected=choose(items).slice(0,8);
   const ranked=[...order(selected),...order(choose(belowMinimum).slice(0,8-selected.length))];
   for(const p of ranked)audit.sectors[directionSector(origin.point,p.point)].selected++;
+  audit.categories=[...new Set(places.map(placeKind))].map(kind=>({kind,candidates:places.filter(p=>placeKind(p)===kind).length,selected:ranked.filter(p=>placeKind(p)===kind).length}));
   audit.routeCalls=budget.used;onAudit?.(audit);
   if(input.mode==='BICYCLE')notices.push(`自転車は推定値です。徒歩経路の距離を平均時速${bicycleSpeedKmh}kmで換算しています。階段・歩行者専用道など、自転車で通行できない道を含む可能性があります。実際の自転車経路・距離・時間は外部Google Mapsで確認してください。`);
   if(!ranked.length&&items.length)notices.push('取得できた経路はすべて指定した時間・距離の上限を超えました。往復は帰りの分も含みます。');

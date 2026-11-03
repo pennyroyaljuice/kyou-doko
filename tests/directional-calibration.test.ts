@@ -16,7 +16,7 @@ it.each(['nature','all','highrated','reviews'] as const)('%s: independent direct
   const body=JSON.parse(options.body as string);
   if(url.includes('searchNearby')){
    const c=body.locationRestriction.circle.center,center={lat:c.latitude,lng:c.longitude};centers.push(center);
-   return Response.json({places:Array.from({length:20},(_,i)=>({id:`${centers.length}-${i}`,location:{latitude:center.lat+i*.0001,longitude:center.lng},displayName:{text:'Synthetic local park'},types:['park'],primaryType:'park',rating:centers.length===1?5:3,userRatingCount:centers.length===1?100000:1}))});
+   return Response.json({places:Array.from({length:20},(_,i)=>({id:`${centers.length}-${i}`,location:{latitude:center.lat+i*.0001,longitude:center.lng},displayName:{text:'Synthetic local park'},types:[body.includedPrimaryTypes[i%body.includedPrimaryTypes.length]],primaryType:body.includedPrimaryTypes[i%body.includedPrimaryTypes.length],rating:centers.length===1?5:3,userRatingCount:centers.length===1?100000:1}))});
   }
   routes++;const b=body.destination.location.latLng,p={lat:b.latitude,lng:b.longitude};
   if(!centers.some(c=>distance(c,p)<1000))probes.push(p);

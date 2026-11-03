@@ -1,5 +1,5 @@
 import { explorationAreas, explorationCandidates } from './exploration';
-import { themeFilter, matchesTheme, type DestinationTheme } from './themes';
+import { themeFilter, matchesDiscovery, discoveryTheme, type DestinationTheme,type DiscoveryScope } from './themes';
 import { photoTicket } from './photos';
 import { AppError, isPoint, radius, type Point, type Place, type Leg, type Mode, type SearchInput } from './domain';
 import type { DiscoveryProvider } from './providers';
@@ -32,24 +32,25 @@ export class GoogleProvider implements DiscoveryProvider {
     if (!p?.location) throw new AppError('出発地点が見つかりませんでした。駅名・住所・緯度,経度で指定してください。',422);
     return {point:{lat:p.location.latitude,lng:p.location.longitude},label:p.displayName?.text ?? origin};
   }
-  async nearby(origin: Point, radius: number, theme: DestinationTheme = 'all', rankPreference: 'POPULARITY'|'DISTANCE' = 'POPULARITY',includeRatings=false): Promise<Place[]> {
+  async nearby(origin: Point, radius: number, theme: DestinationTheme = 'all', rankPreference: 'POPULARITY'|'DISTANCE' = 'POPULARITY',includeRatings=false,scope:DiscoveryScope='full'): Promise<Place[]> {
     const data = await this.request<{places?:GooglePlace[]}>('https://places.googleapis.com/v1/places:searchNearby',{
-      ...themeFilter(theme),maxResultCount:20,languageCode:'ja',rankPreference,locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
+      ...themeFilter(theme,scope),maxResultCount:20,languageCode:'ja',rankPreference,locationRestriction:{circle:{center:{latitude:origin.lat,longitude:origin.lng},radius}}
     },fields+(includeRatings?',places.rating,places.userRatingCount':''));
-    return Promise.all((data.places??[]).filter(p=>p.location && matchesTheme(p.types,theme,p.primaryType)).map(async p=>({rating:typeof p.rating==='number'&&p.rating>=1&&p.rating<=5?p.rating:undefined,userRatingCount:typeof p.userRatingCount==='number'?p.userRatingCount:undefined,id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri})),photo:await this.photo(p)})));
+    return Promise.all((data.places??[]).filter(p=>p.location && matchesDiscovery(p.types,theme,p.primaryType,scope)).map(async p=>({primaryType:p.primaryType,rating:typeof p.rating==='number'&&p.rating>=1&&p.rating<=5?p.rating:undefined,userRatingCount:typeof p.userRatingCount==='number'?p.userRatingCount:undefined,id:p.id,name:p.displayName?.text??'名称不明',point:{lat:p.location!.latitude,lng:p.location!.longitude},category:p.primaryTypeDisplayName?.text??'お出かけスポット',description:p.formattedAddress??'住所情報なし',attributions:p.attributions?.map(a=>({name:a.provider,uri:a.providerUri})),photo:await this.photo(p)})));
   }
   async discover(origin:Point,input:SearchInput,calibrate?:(center:Point)=>Promise<Point>):Promise<Place[]> {
     const groups:Place[][]=[];
     const areas=explorationAreas(origin,input).filter((_,i)=>i===0||i===2);
     // Two opposite discovery tiles leave three calls for successive corrections.
-    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(async a=>this.nearby(calibrate?await calibrate(a.center):a.center,a.radius,input.theme,'DISTANCE',this.includeRatings))));
+    for(let i=0;i<areas.length;i+=2) groups.push(...await Promise.all(areas.slice(i,i+2).map(async(a,index)=>this.nearby(calibrate?await calibrate(a.center):a.center,a.radius,discoveryTheme(input.theme,i+index,input.explorationPage),'DISTANCE',this.includeRatings,'focused'))));
 
     return explorationCandidates(groups,origin,input,100);
   }
   async fallback(origin:Point,input:SearchInput,area?:{center:Point;radius:number}):Promise<Place[]> {
     if(this.refinementCalls>=this.refinementLimit)return [];
     this.refinementCalls++;
-    return this.nearby(area?.center??origin,area?.radius??Math.min(50000,radius(input)*0.45),input.theme,'DISTANCE',this.includeRatings);
+    const full=this.refinementCalls===3;
+    return this.nearby(area?.center??origin,area?.radius??Math.min(50000,radius(input)*0.45),full?input.theme:discoveryTheme(input.theme,this.refinementCalls+1,input.explorationPage),'DISTANCE',this.includeRatings,full?'full':'focused');
   }
   private async photo(place:GooglePlace) {
     const first=place.photos?.[0],secret=this.key;

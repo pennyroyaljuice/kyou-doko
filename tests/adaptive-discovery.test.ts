@@ -15,7 +15,7 @@ it.each(cases)('$region.name / $input.mode / $input.metric / 往復=$input.round
   const b=JSON.parse(options.body as string);
   if(url.includes('searchNearby')){
    nearby++;const c=b.locationRestriction.circle.center;const step=radius(input)*0.018;
-   return Response.json({places:Array.from({length:20},(_,i)=>{const p={latitude:c.latitude+(i-9.5)*step/111200,longitude:c.longitude};return {id:`synthetic-${nearby}-${i}`,location:p,displayName:{text:'合成スポット'},types:['park','tourist_attraction'],primaryType:'park',rating:4.1+i/100,userRatingCount:20+i};})});
+   return Response.json({places:Array.from({length:20},(_,i)=>{const p={latitude:c.latitude+(i-9.5)*step/111200,longitude:c.longitude};return {id:`synthetic-${nearby}-${i}`,location:p,displayName:{text:'合成スポット'},types:[b.includedPrimaryTypes[i%b.includedPrimaryTypes.length]],primaryType:b.includedPrimaryTypes[i%b.includedPrimaryTypes.length],rating:4.1+i/100,userRatingCount:20+i};})});
   }
   routes++;const a=b.origin.location.latLng,z=b.destination.location.latLng;
   const from:Point={lat:a.latitude,lng:a.longitude},to:Point={lat:z.latitude,lng:z.longitude};
